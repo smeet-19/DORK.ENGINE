@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DORK//ENGINE — Advanced OSINT Recon Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── RESET & ROOT ── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#050709;--bg2:#080c10;--bg3:#0d1520;--bg4:#111a26;
+    --border:#1a2535;--border2:#243044;
+    --fg:#8ba4bf;--fg2:#c8dae8;--fg3:#e8f4ff;
+    --accent:#00e5ff;--accent2:#00ff9d;--accent3:#ff3c6e;
+    --accent4:#ffd600;--accent5:#bf5af2;
+    --glow:rgba(0,229,255,0.15);
+    --font-mono:'Share Tech Mono',monospace;
+    --font-display:'Orbitron',monospace;
+    --font-ui:'Rajdhani',sans-serif;
+  }
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--fg2);
+    font-family:var(--font-mono);min-height:100vh;
+    overflow-x:hidden;cursor:default;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%,rgba(0,229,255,0.06),transparent),
+      radial-gradient(ellipse 60% 40% at 100% 80%,rgba(0,255,157,0.04),transparent);
+  }
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:var(--bg2)}
+  ::-webkit-scrollbar-thumb{background:var(--accent);opacity:.3;border-radius:2px}
+  ::selection{background:rgba(0,229,255,0.25);color:#fff}
+
+  /* ── CANVAS BG ── */
+  #bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.6}
+
+  /* ── SCANLINE ── */
+  .scanline{
+    position:fixed;top:0;left:0;right:0;height:2px;z-index:9999;pointer-events:none;
+    background:linear-gradient(transparent,rgba(0,229,255,.25),transparent);
+    animation:scan 7s linear infinite;
+  }
+  @keyframes scan{0%{top:-4px}100%{top:100vh}}
+
+  /* ── NOISE OVERLAY ── */
+  .noise{
+    position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.025;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:150px;
+  }
+
+  /* ── LAYOUT ── */
+  #app{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+
+  /* ── HEADER ── */
+  #header{
+    padding:16px 24px 0;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,rgba(5,7,9,.98),rgba(8,12,16,.95));
+    backdrop-filter:blur(20px);
+    position:sticky;top:0;z-index:100;
+  }
+  .header-top{display:flex;align-items:center;gap:16px;padding-bottom:14px}
+  .logo-area{display:flex;align-items:center;gap:14px;flex:1}
+  .logo-icon{
+    width:42px;height:42px;border:2px solid var(--accent);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;position:relative;
+    box-shadow:0 0 20px rgba(0,229,255,.2),inset 0 0 10px rgba(0,229,255,.05);
+    animation:icon-pulse 3s ease-in-out infinite;
+  }
+  @keyframes icon-pulse{0%,100%{box-shadow:0 0 20px rgba(0,229,255,.2),inset 0 0 10px rgba(0,229,255,.05)}50%{box-shadow:0 0 35px rgba(0,229,255,.4),inset 0 0 15px rgba(0,229,255,.1)}}
+  .logo-text{display:flex;flex-direction:column}
+  .logo-title{
+    font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent));
+    background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    animation:shimmer 4s linear infinite;
+  }
+  @keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+  .logo-sub{font-size:10px;color:var(--fg);letter-spacing:3px;margin-top:2px}
+
+  .stats-bar{display:flex;gap:8px;align-items:center}
+  .stat-chip{
+    background:var(--bg3);border:1px solid var(--border2);
+    border-radius:4px;padding:6px 14px;display:flex;flex-direction:column;
+    align-items:center;min-width:64px;position:relative;overflow:hidden;
+  }
+  .stat-chip::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 60%,rgba(255,255,255,.02));pointer-events:none}
+  .stat-val{font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1}
+  .stat-lbl{font-size:9px;color:var(--fg);letter-spacing:2px;margin-top:3px}
+  .stat-chip.s-total .stat-val{color:var(--accent)}
+  .stat-chip.s-crit .stat-val{color:var(--accent3)}
+  .stat-chip.s-chain .stat-val{color:var(--accent4)}
+  .stat-chip.s-saved .stat-val{color:var(--accent5)}
+
+  /* ── TARGET BAR ── */
+  .target-bar{
+    display:flex;gap:10px;align-items:center;padding:10px 0 12px;flex-wrap:wrap;
+  }
+  .target-input-wrap{
+    flex:1;min-width:200px;position:relative;
+    display:flex;align-items:center;
+  }
+  .target-prefix{
+    position:absolute;left:12px;color:var(--accent2);font-size:14px;z-index:1;pointer-events:none;
+  }
+  .target-input{
+    width:100%;background:var(--bg3);border:1px solid var(--border2);
+    border-radius:6px;padding:10px 12px 10px 32px;
+    color:var(--accent2);font-family:var(--font-mono);font-size:15px;
+    outline:none;transition:all .2s;
+  }
+  .target-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,255,.1),0 0 20px rgba(0,229,255,.05)}
+  .target-input::placeholder{color:var(--fg)}
+
+  .btn{
+    font-family:var(--font-display);font-size:11px;font-weight:700;
+    letter-spacing:1.5px;border:none;border-radius:5px;padding:10px 18px;
+    cursor:pointer;transition:all .15s;position:relative;overflow:hidden;
+    white-space:nowrap;
+  }
+  .btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);pointer-events:none}
+  .btn-primary{background:var(--accent);color:#000}
+  .btn-primary:hover{filter:brightness(1.2);transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,229,255,.4)}
+  .btn-danger{background:var(--accent3);color:#fff}
+  .btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,60,110,.4)}
+  .btn-ghost{background:var(--bg3);color:var(--fg2);border:1px solid var(--border2)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-warn{background:var(--accent4);color:#000}
+  .btn-warn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .btn-ai{background:linear-gradient(135deg,var(--accent5),#7c3aed);color:#fff}
+  .btn-ai:hover{filter:brightness(1.15);transform:translateY(-1px);box-shadow:0 4px 20px rgba(191,90,242,.4)}
+  .btn-sm{padding:6px 12px;font-size:10px}
+  .btn-xs{padding:4px 8px;font-size:9px}
+
+  /* ── TABS ── */
+  .tabs-nav{display:flex;gap:0;border-bottom:none;margin-top:2px}
+  .tab-btn{
+    font-family:var(--font-display);font-size:10px;letter-spacing:2px;font-weight:700;
+    background:transparent;border:none;border-bottom:2px solid transparent;
+    color:var(--fg);padding:8px 16px;cursor:pointer;transition:all .2s;
+  }
+  .tab-btn:hover{color:var(--fg2)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+  /* ── MAIN CONTENT ── */
+  #main{flex:1;display:flex;overflow:hidden;height:calc(100vh - 130px)}
+  .tab-panel{display:none;flex:1;overflow:hidden}
+  .tab-panel.active{display:flex}
+
+  /* ── SIDEBAR ── */
+  .sidebar{
+    width:240px;min-width:200px;background:var(--bg2);
+    border-right:1px solid var(--border);display:flex;flex-direction:column;
+    overflow:hidden;flex-shrink:0;
+  }
+  .sidebar-section{padding:10px 0}
+  .sidebar-title{
+    font-size:9px;letter-spacing:3px;color:var(--fg);
+    padding:4px 14px 8px;text-transform:uppercase;
+  }
+  .cat-item{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 14px;cursor:pointer;transition:all .15s;
+    border-left:3px solid transparent;font-size:12px;color:var(--fg);
+    position:relative;
+  }
+  .cat-item:hover{background:rgba(0,229,255,.04);color:var(--fg2)}
+  .cat-item.active{background:rgba(0,229,255,.07);color:var(--accent);border-left-color:var(--accent)}
+  .cat-item .cat-count{
+    margin-left:auto;font-size:10px;color:var(--fg);
+    background:var(--bg3);padding:2px 6px;border-radius:10px;
+  }
+  .cat-item.active .cat-count{color:var(--accent)}
+  .cat-threat{font-size:8px;letter-spacing:1px;font-weight:700;padding:1px 5px;border-radius:2px;margin-left:auto}
+  .threat-CRITICAL{background:rgba(255,60,110,.15);color:var(--accent3)}
+  .threat-HIGH{background:rgba(255,214,0,.12);color:var(--accent4)}
+  .threat-MEDIUM{background:rgba(0,229,255,.1);color:var(--accent)}
+
+  /* ── PANEL CONTENT ── */
+  .panel-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .panel-body{flex:1;display:flex;gap:0;overflow:hidden}
+
+  /* ── DORK LIST ── */
+  .dork-pane{
+    width:300px;flex-shrink:0;border-right:1px solid var(--border);
+    display:flex;flex-direction:column;background:var(--bg2);overflow:hidden;
+  }
+  .dork-pane-header{
+    padding:12px 14px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--bg3);
+  }
+  .dork-pane-title{font-size:10px;letter-spacing:2px;color:var(--accent)}
+  .dork-list{flex:1;overflow-y:auto;padding:4px}
+  .dork-item{
+    padding:10px 12px;border-radius:5px;cursor:pointer;margin-bottom:2px;
+    transition:all .15s;border:1px solid transparent;position:relative;
+  }
+  .dork-item:hover{background:rgba(0,229,255,.05);border-color:var(--border2)}
+  .dork-item.selected{background:rgba(0,229,255,.08);border-color:rgba(0,229,255,.3)}
+  .dork-item-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .dork-item-label{font-size:12px;color:var(--fg2);flex:1}
+  .dork-item-preview{font-size:10px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.7}
+  .dork-item-tags{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+  .tag{font-size:9px;background:var(--bg3);color:var(--fg);padding:1px 5px;border-radius:2px}
+  .dork-item-actions{
+    display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    gap:4px;background:var(--bg2);padding:2px;border-radius:4px;
+  }
+  .dork-item:hover .dork-item-actions{display:flex}
+
+  /* ── RISK BADGE ── */
+  .risk{font-size:9px;font-weight:700;padding:2px 6px;border-radius:2px;letter-spacing:.5px}
+  .risk-critical{background:rgba(255,60,110,.15);color:#ff3c6e;border:1px solid rgba(255,60,110,.3)}
+  .risk-high{background:rgba(255,214,0,.12);color:#ffd600;border:1px solid rgba(255,214,0,.25)}
+  .risk-medium{background:rgba(0,229,255,.1);color:#00e5ff;border:1px solid rgba(0,229,255,.2)}
+  .risk-low{background:rgba(0,255,157,.08);color:#00ff9d;border:1px solid rgba(0,255,157,.2)}
+
+  /* ── RESULTS PANEL ── */
+  .results-pane{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .results-header{
+    padding:10px 16px;border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--bg2);
+  }
+  .results-title{font-size:10px;letter-spacing:2px;color:var(--accent2)}
+  .filter-chips{display:flex;gap:4px;margin-left:auto}
+  .filter-chip{
+    font-size:9px;padding:3px 8px;border-radius:12px;cursor:pointer;
+    border:1px solid var(--border2);background:var(--bg3);color:var(--fg);
+    transition:all .15s;font-family:var(--font-mono);
+  }
+  .filter-chip:hover,.filter-chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+  .filter-chip.f-critical.active{background:var(--accent3);border-color:var(--accent3);color:#fff}
+  .filter-chip.f-high.active{background:var(--accent4);border-color:var(--accent4);color:#000}
+  .filter-chip.f-medium.active{background:var(--accent);border-color:var(--accent);color:#000}
+  .filter-chip.f-low.active{background:var(--accent2);border-color:var(--accent2);color:#000}
+
+  #results-list{flex:1;overflow-y:auto;padding:8px}
+  .result-card{
+    background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+    padding:12px 14px;margin-bottom:8px;
+    animation:slide-in .3s ease;transition:border-color .2s;
+    position:relative;overflow:hidden;
+  }
+  .result-card::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--accent);
+  }
+  .result-card.risk-critical::before{background:var(--accent3)}
+  .result-card.risk-high::before{background:var(--accent4)}
+  .result-card.risk-low::before{background:var(--accent2)}
+  .result-card:hover{border-color:var(--border2)}
+  @keyframes slide-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .result-card-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .result-idx{font-size:10px;color:var(--fg);font-family:var(--font-mono)}
+  .result-label{font-size:12px;color:var(--fg3);font-weight:600;flex:1}
+  .result-time{font-size:9px;color:var(--fg)}
+  .result-query{
+    font-size:11px;color:var(--fg);background:var(--bg2);
+    padding:7px 10px;border-radius:4px;margin-bottom:8px;
+    word-break:break-all;line-height:1.6;border:1px solid var(--border);
+    font-family:var(--font-mono);
+  }
+  .result-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .result-cat{font-size:9px;color:var(--fg);margin-left:auto;opacity:.7}
+
+  .empty-state{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;color:var(--fg);gap:12px;opacity:.5;
+  }
+  .empty-icon{font-size:48px;opacity:.3}
+  .empty-text{font-size:12px;letter-spacing:2px}
+
+  /* ── SEARCH TAB ── */
+  .search-layout{flex:1;display:flex;flex-direction:column;padding:16px;overflow:hidden}
+  .search-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .search-input{
+    flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border2);
+    border-radius:6px;padding:10px 14px;color:var(--fg2);
+    font-family:var(--font-mono);font-size:13px;outline:none;transition:all .2s;
+  }
+  .search-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,255,.1)}
+  .search-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .search-table-wrap{
+    flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;
+  }
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  thead{position:sticky;top:0;z-index:2}
+  thead tr{background:var(--bg3)}
+  th{
+    padding:10px 12px;text-align:left;font-family:var(--font-display);
+    font-size:9px;letter-spacing:2px;color:var(--accent);
+    border-bottom:1px solid var(--border);cursor:pointer;user-select:none;
+    white-space:nowrap;
+  }
+  th:hover{color:var(--fg2)}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+  tbody tr:hover{background:rgba(0,229,255,.04)}
+  td{padding:9px 12px;color:var(--fg2)}
+  td.td-risk{width:90px}
+  td.td-label{width:180px;color:var(--fg3);font-weight:600}
+  td.td-cat{width:150px;color:var(--fg)}
+  td.td-template{color:var(--fg);font-size:10px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  td.td-actions{width:120px;white-space:nowrap}
+  .search-stats{font-size:10px;color:var(--fg);letter-spacing:1px;margin-bottom:8px}
+
+  /* ── CHAIN TAB ── */
+  .chain-layout{flex:1;display:flex;flex-direction:column;padding:16px;overflow:hidden;gap:12px}
+  .chain-header{display:flex;align-items:center;gap:10px}
+  .chain-title{font-family:var(--font-display);font-size:14px;color:var(--accent4);letter-spacing:2px}
+  .chain-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .chain-item{
+    background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+    padding:10px 14px;display:flex;align-items:center;gap:10px;
+    transition:all .15s;
+  }
+  .chain-item:hover{border-color:var(--border2)}
+  .chain-num{
+    font-family:var(--font-display);font-size:11px;color:var(--accent4);
+    width:28px;text-align:center;flex-shrink:0;
+  }
+  .chain-item-info{flex:1;min-width:0}
+  .chain-item-label{font-size:12px;color:var(--fg2);margin-bottom:3px}
+  .chain-item-query{font-size:10px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chain-empty{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    flex:1;color:var(--fg);opacity:.4;gap:10px;font-size:12px;letter-spacing:2px;
+  }
+  .chain-progress{
+    background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px 14px;
+  }
+  .chain-progress-bar{
+    height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:6px;
+  }
+  .chain-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent4),var(--accent));width:0%;transition:width .3s}
+
+  /* ── AI TAB ── */
+  .ai-layout{flex:1;display:flex;gap:0;overflow:hidden}
+  .ai-left{width:380px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px;gap:12px;overflow-y:auto}
+  .ai-right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .ai-section-title{font-size:9px;letter-spacing:3px;color:var(--accent5);margin-bottom:6px;text-transform:uppercase}
+  .ai-key-wrap{position:relative}
+  .ai-key-input{
+    width:100%;background:var(--bg3);border:1px solid var(--border2);
+    border-radius:6px;padding:9px 36px 9px 12px;
+    color:var(--accent5);font-family:var(--font-mono);font-size:12px;outline:none;
+    transition:all .2s;
+  }
+  .ai-key-input:focus{border-color:var(--accent5);box-shadow:0 0 0 2px rgba(191,90,242,.1)}
+  .ai-key-toggle{
+    position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    background:none;border:none;color:var(--fg);cursor:pointer;font-size:14px;
+  }
+  .ai-prompt-area{
+    width:100%;background:var(--bg3);border:1px solid var(--border2);
+    border-radius:6px;padding:10px 12px;color:var(--fg2);
+    font-family:var(--font-mono);font-size:12px;resize:vertical;
+    outline:none;transition:all .2s;min-height:100px;
+  }
+  .ai-prompt-area:focus{border-color:var(--accent5);box-shadow:0 0 0 2px rgba(191,90,242,.1)}
+  .ai-model-badge{
+    font-size:9px;background:rgba(191,90,242,.1);color:var(--accent5);
+    border:1px solid rgba(191,90,242,.2);padding:3px 8px;border-radius:12px;
+    letter-spacing:1px;display:inline-block;
+  }
+  .ai-thinking{
+    display:none;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px;gap:12px;
+  }
+  .ai-thinking.active{display:flex}
+  .ai-spinner{
+    width:48px;height:48px;border:2px solid rgba(191,90,242,.2);
+    border-top-color:var(--accent5);border-radius:50%;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ai-thinking-text{font-size:11px;color:var(--accent5);letter-spacing:2px;animation:blink 1.5s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+  .ai-results-list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+  .ai-result-card{
+    background:var(--bg3);border:1px solid rgba(191,90,242,.15);border-radius:8px;
+    padding:12px 14px;animation:slide-in .3s ease;
+  }
+  .ai-result-card:hover{border-color:rgba(191,90,242,.35)}
+  .ai-result-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .ai-result-label{font-size:12px;color:var(--fg3);font-weight:600;flex:1}
+  .ai-result-query{
+    font-size:11px;color:var(--fg);background:var(--bg2);
+    padding:7px 10px;border-radius:4px;margin-bottom:6px;
+    word-break:break-all;font-family:var(--font-mono);
+    border:1px solid var(--border);
+  }
+  .ai-result-explanation{font-size:10px;color:var(--fg);font-style:italic;margin-bottom:8px;opacity:.8}
+  .ai-suggestions{display:flex;flex-direction:column;gap:6px}
+  .ai-suggestion-btn{
+    background:var(--bg4);border:1px solid var(--border);border-radius:4px;
+    padding:8px 12px;text-align:left;color:var(--fg);font-size:11px;
+    cursor:pointer;transition:all .15s;font-family:var(--font-mono);
+  }
+  .ai-suggestion-btn:hover{border-color:var(--accent5);color:var(--fg2);background:rgba(191,90,242,.05)}
+
+  /* ── OPERATORS TAB ── */
+  .ops-layout{flex:1;display:flex;gap:0;overflow:hidden}
+  .ops-left{width:480px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:16px}
+  .ops-right{flex:1;padding:16px;overflow-y:auto}
+  .ops-title{font-family:var(--font-display);font-size:12px;color:var(--accent2);letter-spacing:2px;margin-bottom:12px}
+  .op-card{
+    background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+    padding:12px 14px;margin-bottom:6px;cursor:pointer;transition:all .15s;
+    display:flex;gap:12px;align-items:center;
+  }
+  .op-card:hover{border-color:var(--accent2);background:rgba(0,255,157,.04)}
+  .op-code{
+    font-family:var(--font-mono);font-size:13px;color:var(--accent2);
+    background:var(--bg2);padding:4px 10px;border-radius:4px;
+    border:1px solid rgba(0,255,157,.2);white-space:nowrap;min-width:100px;text-align:center;
+  }
+  .op-desc{font-size:11px;color:var(--fg2);flex:1}
+  .op-example{font-size:10px;color:var(--fg);font-family:var(--font-mono);font-style:italic}
+  .builder-section{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px}
+  .builder-title{font-size:10px;letter-spacing:3px;color:var(--accent2);margin-bottom:12px}
+  .builder-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .builder-input{
+    flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--border2);
+    border-radius:5px;padding:8px 12px;color:var(--fg2);
+    font-family:var(--font-mono);font-size:12px;outline:none;
+  }
+  .builder-input:focus{border-color:var(--accent2)}
+  .builder-preview{
+    background:var(--bg2);border:1px solid var(--border);border-radius:5px;
+    padding:10px 12px;font-size:12px;color:var(--accent2);
+    font-family:var(--font-mono);word-break:break-all;min-height:44px;
+    margin-bottom:8px;
+  }
+
+  /* ── EXPORT TAB ── */
+  .export-layout{flex:1;display:flex;gap:0;overflow:hidden}
+  .export-left{width:340px;flex-shrink:0;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+  .export-right{flex:1;overflow-y:auto;padding:16px}
+  .export-title{font-family:var(--font-display);font-size:12px;color:var(--accent2);letter-spacing:2px;margin-bottom:8px}
+  .export-section{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px}
+  .export-section-title{font-size:9px;letter-spacing:3px;color:var(--fg);margin-bottom:10px}
+  .format-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .format-btn{
+    background:var(--bg2);border:1px solid var(--border2);border-radius:5px;
+    padding:10px;text-align:center;cursor:pointer;transition:all .15s;
+    font-family:var(--font-display);font-size:11px;color:var(--fg);
+  }
+  .format-btn:hover,.format-btn.active{background:rgba(0,255,157,.08);border-color:var(--accent2);color:var(--accent2)}
+  .format-ext{font-size:18px;margin-bottom:4px}
+  .export-preview{
+    background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+    padding:12px;font-size:11px;color:var(--fg);font-family:var(--font-mono);
+    white-space:pre-wrap;word-break:break-all;flex:1;overflow-y:auto;
+    max-height:400px;line-height:1.6;
+  }
+
+  /* ── RADAR / VISUALIZE TAB ── */
+  .viz-layout{flex:1;display:flex;gap:0;overflow:hidden}
+  .viz-left{width:300px;flex-shrink:0;border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+  .viz-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
+  #radar-canvas{border-radius:50%;box-shadow:0 0 60px rgba(0,229,255,.1)}
+  .viz-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center}
+  .viz-legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--fg)}
+  .viz-dot{width:8px;height:8px;border-radius:50%}
+
+  /* ── STATUS BAR ── */
+  #statusbar{
+    background:var(--bg3);border-top:1px solid var(--border);
+    padding:5px 20px;display:flex;align-items:center;gap:16px;
+    font-size:10px;color:var(--fg);
+  }
+  .status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse-dot 2s ease-in-out infinite}
+  @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  #status-msg{flex:1}
+  .status-right{display:flex;gap:12px;opacity:.6}
+
+  /* ── TOAST ── */
+  #toast-container{position:fixed;bottom:60px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+  .toast{
+    background:var(--bg3);border:1px solid var(--border2);border-radius:6px;
+    padding:10px 16px;font-size:11px;color:var(--fg2);
+    display:flex;align-items:center;gap:8px;
+    animation:toast-in .3s ease;box-shadow:0 4px 20px rgba(0,0,0,.4);
+    max-width:300px;
+  }
+  .toast.success{border-color:rgba(0,255,157,.3);color:var(--accent2)}
+  .toast.error{border-color:rgba(255,60,110,.3);color:var(--accent3)}
+  .toast.info{border-color:rgba(0,229,255,.3);color:var(--accent)}
+  @keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+  .toast.out{animation:toast-out .3s ease forwards}
+  @keyframes toast-out{to{opacity:0;transform:translateX(20px)}}
+
+  /* ── MODAL ── */
+  .modal-overlay{
+    position:fixed;inset:0;z-index:1000;background:rgba(5,7,9,.85);
+    display:flex;align-items:center;justify-content:center;
+    backdrop-filter:blur(8px);
+    opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .modal-overlay.active{opacity:1;pointer-events:all}
+  .modal{
+    background:var(--bg2);border:1px solid var(--border2);border-radius:12px;
+    padding:24px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(0,229,255,.05);
+    transform:translateY(20px);transition:transform .2s;
+  }
+  .modal-overlay.active .modal{transform:translateY(0)}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .modal-title{font-family:var(--font-display);font-size:14px;color:var(--fg3);letter-spacing:2px}
+  .modal-close{background:none;border:none;color:var(--fg);cursor:pointer;font-size:20px;transition:color .15s}
+  .modal-close:hover{color:var(--accent3)}
+  .modal-body{font-size:12px;color:var(--fg2);line-height:1.7}
+  .modal-url{
+    background:var(--bg3);border:1px solid var(--border);border-radius:5px;
+    padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--accent);
+    word-break:break-all;margin:10px 0;
+  }
+
+  /* ── CUSTOM BUILDER ── */
+  .custom-builder{padding:16px;display:flex;flex-direction:column;gap:10px;height:100%;overflow-y:auto}
+  .cb-title{font-family:var(--font-display);font-size:12px;color:var(--accent5);letter-spacing:2px}
+  .cb-field{display:flex;flex-direction:column;gap:4px}
+  .cb-label{font-size:9px;letter-spacing:2px;color:var(--fg)}
+  .cb-input,.cb-select,.cb-textarea{
+    background:var(--bg3);border:1px solid var(--border2);border-radius:5px;
+    padding:9px 12px;color:var(--fg2);font-family:var(--font-mono);font-size:12px;outline:none;
+    transition:border-color .2s;width:100%;
+  }
+  .cb-input:focus,.cb-select:focus,.cb-textarea:focus{border-color:var(--accent5)}
+  .cb-textarea{resize:vertical;min-height:80px}
+  .cb-select option{background:var(--bg3)}
+  .cb-hint{font-size:10px;color:var(--fg);opacity:.7;font-style:italic}
+  .cb-preview{
+    background:var(--bg2);border:1px solid var(--border);border-radius:5px;
+    padding:10px 12px;font-size:11px;color:var(--accent5);font-family:var(--font-mono);
+    word-break:break-all;min-height:40px;
+  }
+
+  /* ── MISC ── */
+  .sep{height:1px;background:var(--border);margin:8px 0}
+  .badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;letter-spacing:.5px}
+  .badge-new{background:rgba(0,255,157,.15);color:var(--accent2);border:1px solid rgba(0,255,157,.25)}
+  .badge-ai{background:rgba(191,90,242,.15);color:var(--accent5);border:1px solid rgba(191,90,242,.25)}
+  .flex{display:flex}.gap-2{gap:8px}.items-center{align-items:center}.flex-1{flex:1}
+  .text-accent{color:var(--accent)}.text-sm{font-size:11px}.text-xs{font-size:10px}
+  .text-dim{color:var(--fg)}.ml-auto{margin-left:auto}
+  input[type=checkbox]{accent-color:var(--accent);cursor:pointer}
+  .copyable{cursor:pointer;transition:color .15s}.copyable:hover{color:var(--accent)}
+  .highlight-row{background:rgba(0,229,255,.04)!important}
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:900px){
+    .sidebar{width:180px}
+    .dork-pane{width:240px}
+    .stats-bar{flex-wrap:wrap}
+  }
+  @media(max-width:700px){
+    .sidebar{display:none}
+    .dork-pane{width:100%;border-right:none;height:200px}
+    .panel-body{flex-direction:column}
+    .ai-layout{flex-direction:column}
+    .ai-left{width:100%;border-right:none;border-bottom:1px solid var(--border)}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanline"></div>
+<div class="noise"></div>
+<div id="toast-container"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">QUERY DETAILS</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div id="app">
+  <!-- HEADER -->
+  <header id="header">
+    <div class="header-top">
+      <div class="logo-area">
+        <div class="logo-icon">⬡</div>
+        <div class="logo-text">
+          <div class="logo-title">DORK//ENGINE</div>
+          <div class="logo-sub">ADVANCED OSINT RECON FRAMEWORK v4.0</div>
+        </div>
+        <span class="badge badge-new" style="margin-left:12px">NEW</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-chip s-total"><div class="stat-val" id="stat-total">0</div><div class="stat-lbl">RESULTS</div></div>
+        <div class="stat-chip s-crit"><div class="stat-val" id="stat-crit">0</div><div class="stat-lbl">CRITICAL</div></div>
+        <div class="stat-chip s-chain"><div class="stat-val" id="stat-chain">0</div><div class="stat-lbl">CHAIN</div></div>
+        <div class="stat-chip s-saved"><div class="stat-val" id="stat-saved">0</div><div class="stat-lbl">SAVED</div></div>
+      </div>
+    </div>
+    <div class="target-bar">
+      <div class="target-input-wrap">
+        <span class="target-prefix">⬡</span>
+        <input class="target-input" id="target-input" placeholder="target.com" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn btn-primary" onclick="runAllCurrent()">▶ RUN ALL</button>
+      <button class="btn btn-warn btn-sm" onclick="runChain()" title="Execute chain">⛓ CHAIN</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearResults()">✕ CLEAR</button>
+      <button class="btn btn-ghost btn-sm" onclick="openSavedPanel()">♥ SAVED</button>
+      <button class="btn btn-ghost btn-sm" id="theme-toggle" onclick="toggleTheme()">◑ THEME</button>
+    </div>
+    <nav class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('generator',this)">⬡ GENERATOR</button>
+      <button class="tab-btn" onclick="switchTab('search',this)">⌕ SEARCH</button>
+      <button class="tab-btn" onclick="switchTab('chain',this)">⛓ CHAIN</button>
+      <button class="tab-btn" onclick="switchTab('ai',this)">✦ AI GENERATE <span class="badge badge-ai" style="font-size:8px">CLAUDE</span></button>
+      <button class="tab-btn" onclick="switchTab('operators',this)">⌗ OPERATORS</button>
+      <button class="tab-btn" onclick="switchTab('custom',this)">✏ BUILDER</button>
+      <button class="tab-btn" onclick="switchTab('export',this)">↓ EXPORT</button>
+      <button class="tab-btn" onclick="switchTab('viz',this)">◎ RADAR</button>
+    </nav>
+  </header>
+
+  <div id="main">
+
+    <!-- ── GENERATOR TAB ── -->
+    <div class="tab-panel active" id="tab-generator">
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-title">CATEGORIES</div>
+          <div id="cat-list"></div>
+        </div>
+      </aside>
+      <div class="panel-content">
+        <div class="panel-body">
+          <div class="dork-pane">
+            <div class="dork-pane-header">
+              <span class="dork-pane-title" id="dork-pane-title">SELECT CATEGORY</span>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-primary btn-xs" onclick="runAllCurrent()">▶ ALL</button>
+                <button class="btn btn-warn btn-xs" onclick="chainAllCurrent()">⛓</button>
+              </div>
+            </div>
+            <div class="dork-list" id="dork-list"></div>
+          </div>
+          <div class="results-pane">
+            <div class="results-header">
+              <span class="results-title">◉ RESULTS</span>
+              <span id="results-count" style="font-size:10px;color:var(--fg)">0 queries</span>
+              <div class="filter-chips">
+                <span class="filter-chip active" data-filter="all" onclick="setFilter('all',this)">ALL</span>
+                <span class="filter-chip f-critical" data-filter="critical" onclick="setFilter('critical',this)">CRITICAL</span>
+                <span class="filter-chip f-high" data-filter="high" onclick="setFilter('high',this)">HIGH</span>
+                <span class="filter-chip f-medium" data-filter="medium" onclick="setFilter('medium',this)">MEDIUM</span>
+                <span class="filter-chip f-low" data-filter="low" onclick="setFilter('low',this)">LOW</span>
+              </div>
+              <button class="btn btn-ghost btn-xs" onclick="openAllInBrowser()">↗ OPEN ALL</button>
+              <button class="btn btn-ghost btn-xs" onclick="saveAll()">♥ SAVE ALL</button>
+            </div>
+            <div id="results-list">
+              <div class="empty-state">
+                <div class="empty-icon">⬚</div>
+                <div class="empty-text">SELECT A DORK TO BEGIN</div>
+                <div style="font-size:10px;opacity:.5">Set target domain → choose category → run dorks</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SEARCH TAB ── -->
+    <div class="tab-panel" id="tab-search">
+      <div class="search-layout">
+        <div class="search-bar">
+          <input class="search-input" id="search-input" placeholder="Search by name, keyword, tag, or risk level..." oninput="doSearch()">
+          <button class="btn btn-primary" onclick="runAllSearch()">▶ RUN ALL MATCHES</button>
+          <button class="btn btn-warn btn-sm" onclick="chainAllSearch()">⛓ CHAIN ALL</button>
+          <button class="btn btn-ghost btn-sm" onclick="doSearch()">⌕ REFRESH</button>
+        </div>
+        <div class="search-filters" id="search-risk-filters">
+          <span style="font-size:10px;color:var(--fg);line-height:24px">Risk:</span>
+          <span class="filter-chip active" onclick="setSearchRisk('all',this)">ALL</span>
+          <span class="filter-chip f-critical" onclick="setSearchRisk('critical',this)">CRITICAL</span>
+          <span class="filter-chip f-high" onclick="setSearchRisk('high',this)">HIGH</span>
+          <span class="filter-chip f-medium" onclick="setSearchRisk('medium',this)">MEDIUM</span>
+          <span class="filter-chip f-low" onclick="setSearchRisk('low',this)">LOW</span>
+          <span style="font-size:10px;color:var(--fg);margin-left:8px;line-height:24px">Sort:</span>
+          <select id="sort-select" onchange="doSearch()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--fg2);font-family:var(--font-mono);font-size:10px;padding:3px 6px;border-radius:4px;outline:none">
+            <option value="default">DEFAULT</option>
+            <option value="risk-asc">RISK ↑</option>
+            <option value="risk-desc">RISK ↓</option>
+            <option value="name">NAME A-Z</option>
+          </select>
+        </div>
+        <div class="search-stats" id="search-stats">Loading...</div>
+        <div class="search-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortTable('risk')">RISK ↕</th>
+                <th onclick="sortTable('label')">LABEL ↕</th>
+                <th onclick="sortTable('category')">CATEGORY ↕</th>
+                <th>TEMPLATE</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="search-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHAIN TAB ── -->
+    <div class="tab-panel" id="tab-chain">
+      <div class="chain-layout">
+        <div class="chain-header">
+          <span class="chain-title">⛓ CHAIN BUILDER</span>
+          <span id="chain-badge" style="font-size:10px;color:var(--accent4)">0 dorks queued</span>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-warn" onclick="runChain()">▶ EXECUTE CHAIN</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearChain()">🗑 CLEAR</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportChain()">↓ EXPORT CHAIN</button>
+          </div>
+        </div>
+        <div class="chain-progress" id="chain-progress" style="display:none">
+          <div style="display:flex;justify-content:space-between;font-size:10px">
+            <span style="color:var(--accent4)">⛓ EXECUTING CHAIN...</span>
+            <span id="chain-prog-text" style="color:var(--fg)">0 / 0</span>
+          </div>
+          <div class="chain-progress-bar"><div class="chain-progress-fill" id="chain-prog-fill"></div></div>
+        </div>
+        <div class="chain-list" id="chain-list">
+          <div class="chain-empty">
+            <div style="font-size:36px;opacity:.3">⛓</div>
+            <div>CHAIN IS EMPTY</div>
+            <div style="font-size:10px;opacity:.6">Add dorks using the ⛓ button in Generator or Search</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AI TAB ── -->
+    <div class="tab-panel" id="tab-ai">
+      <div class="ai-layout">
+        <div class="ai-left">
+          <div>
+            <div class="ai-section-title">AI ENGINE</div>
+            <div class="ai-model-badge">claude-sonnet-4-20250514</div>
+          </div>
+          <div>
+            <div class="ai-section-title">API KEY</div>
+            <div class="ai-key-wrap">
+              <input class="ai-key-input" type="password" id="ai-key" placeholder="sk-ant-api03-...">
+              <button class="ai-key-toggle" onclick="toggleAiKey()">👁</button>
+            </div>
+          </div>
+          <div>
+            <div class="ai-section-title">TARGET CONTEXT</div>
+            <input class="ai-key-input" type="text" id="ai-target-ctx" placeholder="Same as main target (optional override)" style="color:var(--fg2)">
+          </div>
+          <div>
+            <div class="ai-section-title">RECON OBJECTIVE</div>
+            <textarea class="ai-prompt-area" id="ai-prompt" placeholder="Describe your recon objective in detail...&#10;&#10;e.g. Find exposed credentials, internal documents, and admin panels for a fintech company. Focus on cloud storage, API leaks, and database exposures."></textarea>
+          </div>
+          <div>
+            <div class="ai-section-title">QUICK OBJECTIVES</div>
+            <div class="ai-suggestions">
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Find exposed API keys, tokens, and credentials for cloud services and third-party integrations">🔑 Credential Hunting</button>
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Discover admin panels, login pages, and internal dashboards that are publicly accessible">🔐 Admin Panel Discovery</button>
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Find exposed databases, SQL dumps, backup files, and configuration files containing sensitive data">🗄️ Database Exposure</button>
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Map the complete tech stack, identify frameworks, CMS platforms, and server technologies">⚙️ Tech Stack Fingerprint</button>
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Find employee information, org charts, email addresses, and social media profiles for OSINT">🕵️ People & Org OSINT</button>
+              <button class="ai-suggestion-btn" onclick="setAiPrompt(this.dataset.p)" data-p="Discover cloud storage buckets, exposed containers, and misconfigured cloud infrastructure">☁️ Cloud Asset Recon</button>
+            </div>
+          </div>
+          <div>
+            <div class="ai-section-title">COUNT</div>
+            <select id="ai-count" style="background:var(--bg3);border:1px solid var(--border2);color:var(--fg2);font-family:var(--font-mono);font-size:12px;padding:8px;border-radius:5px;outline:none;width:100%">
+              <option value="6">6 dorks</option>
+              <option value="8" selected>8 dorks</option>
+              <option value="10">10 dorks</option>
+              <option value="12">12 dorks</option>
+            </select>
+          </div>
+          <button class="btn btn-ai" style="width:100%" onclick="runAI()">✦ GENERATE WITH CLAUDE</button>
+          <div id="ai-status" style="font-size:10px;color:var(--accent5);text-align:center;min-height:16px"></div>
+        </div>
+        <div class="ai-right">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+            <span style="font-size:10px;letter-spacing:2px;color:var(--accent5)">✦ AI RESULTS</span>
+            <span id="ai-count-badge" style="font-size:10px;color:var(--fg)"></span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button class="btn btn-ghost btn-xs" onclick="runAllAI()">▶ RUN ALL</button>
+              <button class="btn btn-warn btn-xs" onclick="chainAllAI()">⛓ CHAIN ALL</button>
+            </div>
+          </div>
+          <div class="ai-thinking" id="ai-thinking">
+            <div class="ai-spinner"></div>
+            <div class="ai-thinking-text">CLAUDE IS ANALYZING YOUR OBJECTIVE...</div>
+            <div style="font-size:10px;color:var(--fg);margin-top:4px">Generating advanced OSINT queries</div>
+          </div>
+          <div class="ai-results-list" id="ai-results"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── OPERATORS TAB ── -->
+    <div class="tab-panel" id="tab-operators">
+      <div class="ops-layout">
+        <div class="ops-left">
+          <div class="ops-title">⌗ GOOGLE OPERATORS REFERENCE</div>
+          <div id="ops-list"></div>
+        </div>
+        <div class="ops-right">
+          <div class="builder-section">
+            <div class="builder-title">⌗ QUERY BUILDER</div>
+            <div id="builder-chips" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px"></div>
+            <div class="builder-row">
+              <select id="builder-op" class="builder-input" onchange="updateBuilderPreview()">
+                <option value="">-- Select operator --</option>
+                <option value="site:">site:</option>
+                <option value="inurl:">inurl:</option>
+                <option value="intitle:">intitle:</option>
+                <option value="intext:">intext:</option>
+                <option value="filetype:">filetype:</option>
+                <option value="ext:">ext:</option>
+                <option value="-">- (exclude)</option>
+                <option value='""'>"" (exact)</option>
+                <option value="before:">before:</option>
+                <option value="after:">after:</option>
+              </select>
+              <input class="builder-input" id="builder-val" placeholder="value..." oninput="updateBuilderPreview()">
+              <button class="btn btn-ghost btn-sm" onclick="addBuilderChip()">+ ADD</button>
+            </div>
+            <div class="builder-row">
+              <input class="builder-input" id="builder-extra" placeholder="additional terms..." oninput="updateBuilderPreview()">
+            </div>
+            <div style="font-size:9px;color:var(--fg);margin-bottom:6px;letter-spacing:1px">PREVIEW:</div>
+            <div class="builder-preview" id="builder-preview">Your query will appear here...</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" onclick="runBuilderQuery()">▶ RUN QUERY</button>
+              <button class="btn btn-warn btn-sm" onclick="chainBuilderQuery()">⛓ ADD TO CHAIN</button>
+              <button class="btn btn-ghost btn-sm" onclick="copyBuilderQuery()">⎘ COPY</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearBuilder()">✕ CLEAR</button>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="ops-title" style="margin-bottom:10px">ADVANCED COMBINATIONS</div>
+            <div id="combo-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CUSTOM BUILDER TAB ── -->
+    <div class="tab-panel" id="tab-custom">
+      <div style="display:flex;flex:1;overflow:hidden">
+        <div class="custom-builder" style="flex:1;max-width:480px;border-right:1px solid var(--border)">
+          <div class="cb-title">✏ CUSTOM DORK BUILDER</div>
+          <div class="sep"></div>
+          <div class="cb-field">
+            <label class="cb-label">DORK NAME / LABEL</label>
+            <input class="cb-input" id="cb-label" placeholder="e.g. Custom Password Hunt">
+          </div>
+          <div class="cb-field">
+            <label class="cb-label">RISK LEVEL</label>
+            <select class="cb-select" id="cb-risk">
+              <option value="critical">CRITICAL</option>
+              <option value="high">HIGH</option>
+              <option value="medium" selected>MEDIUM</option>
+              <option value="low">LOW</option>
+            </select>
+          </div>
+          <div class="cb-field">
+            <label class="cb-label">CATEGORY</label>
+            <input class="cb-input" id="cb-category" placeholder="e.g. Custom / File Exposure" value="Custom">
+          </div>
+          <div class="cb-field">
+            <label class="cb-label">DORK TEMPLATE</label>
+            <textarea class="cb-textarea" id="cb-template" oninput="updateCbPreview()" placeholder='site:{target} intext:"password" filetype:txt'></textarea>
+            <span class="cb-hint">Use {target} as placeholder for the target domain</span>
+          </div>
+          <div class="cb-field">
+            <label class="cb-label">TAGS (comma-separated)</label>
+            <input class="cb-input" id="cb-tags" placeholder="e.g. secrets, passwords, files">
+          </div>
+          <div class="cb-field">
+            <label class="cb-label">PREVIEW</label>
+            <div class="cb-preview" id="cb-preview">Your query will appear here...</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="runCustomDork()">▶ RUN NOW</button>
+            <button class="btn btn-warn btn-sm" onclick="chainCustomDork()">⛓ ADD TO CHAIN</button>
+            <button class="btn btn-ghost btn-sm" onclick="saveCustomDork()">♥ SAVE DORK</button>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;padding:16px;overflow-y:auto">
+          <div style="font-family:var(--font-display);font-size:11px;color:var(--accent5);letter-spacing:2px;margin-bottom:12px">SAVED CUSTOM DORKS</div>
+          <div id="custom-saved-list" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div class="sep" style="margin:16px 0"></div>
+          <div style="font-family:var(--font-display);font-size:11px;color:var(--accent);letter-spacing:2px;margin-bottom:12px">IMPORT DORK</div>
+          <textarea class="cb-textarea" id="import-textarea" placeholder='Paste raw dork or JSON: {"label":"...","template":"...","risk":"..."}'></textarea>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px;align-self:flex-start" onclick="importDork()">↑ IMPORT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EXPORT TAB ── -->
+    <div class="tab-panel" id="tab-export">
+      <div class="export-layout">
+        <div class="export-left">
+          <div class="export-title">↓ EXPORT ENGINE</div>
+          <div class="export-section">
+            <div class="export-section-title">FORMAT</div>
+            <div class="format-grid">
+              <div class="format-btn active" data-fmt="txt" onclick="setExportFmt('txt',this)"><div class="format-ext">📄</div>.TXT</div>
+              <div class="format-btn" data-fmt="csv" onclick="setExportFmt('csv',this)"><div class="format-ext">📊</div>.CSV</div>
+              <div class="format-btn" data-fmt="json" onclick="setExportFmt('json',this)"><div class="format-ext">🗂</div>.JSON</div>
+              <div class="format-btn" data-fmt="md" onclick="setExportFmt('md',this)"><div class="format-ext">📝</div>.MD</div>
+            </div>
+          </div>
+          <div class="export-section">
+            <div class="export-section-title">RISK FILTER</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="radio" name="export-risk" value="all" checked onchange="refreshExportPreview()"> All Risks</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;color:var(--accent3)"><input type="radio" name="export-risk" value="critical" onchange="refreshExportPreview()"> Critical Only</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;color:var(--accent4)"><input type="radio" name="export-risk" value="high" onchange="refreshExportPreview()"> High & Above</label>
+            </div>
+          </div>
+          <div class="export-section">
+            <div class="export-section-title">INCLUDE</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="inc-queries" checked onchange="refreshExportPreview()"> Queries</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="inc-urls" checked onchange="refreshExportPreview()"> URLs</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer"><input type="checkbox" id="inc-meta" checked onchange="refreshExportPreview()"> Metadata</label>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="doExport()">↓ DOWNLOAD REPORT</button>
+          <button class="btn btn-ghost" style="width:100%;margin-top:6px" onclick="copyExport()">⎘ COPY TO CLIPBOARD</button>
+          <div id="export-stats" style="font-size:10px;color:var(--fg);text-align:center;margin-top:8px"></div>
+        </div>
+        <div class="export-right">
+          <div style="font-size:10px;letter-spacing:2px;color:var(--accent2);margin-bottom:10px">EXPORT PREVIEW</div>
+          <pre class="export-preview" id="export-preview">No results yet...</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RADAR/VIZ TAB ── -->
+    <div class="tab-panel" id="tab-viz">
+      <div class="viz-layout">
+        <div class="viz-left">
+          <div style="font-family:var(--font-display);font-size:12px;color:var(--accent);letter-spacing:2px;margin-bottom:12px">◎ THREAT RADAR</div>
+          <div style="font-size:11px;color:var(--fg);margin-bottom:16px;line-height:1.7">
+            Visual analysis of your current results. The radar shows threat distribution across all scanned dorks.
+          </div>
+          <div id="viz-stats" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div class="sep"></div>
+          <div style="font-size:10px;letter-spacing:2px;color:var(--accent);margin-bottom:10px">CATEGORY BREAKDOWN</div>
+          <div id="viz-cats" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div class="sep"></div>
+          <button class="btn btn-primary btn-sm" onclick="drawRadar()" style="width:100%">↺ REFRESH RADAR</button>
+        </div>
+        <div class="viz-right">
+          <canvas id="radar-canvas" width="420" height="420"></canvas>
+          <div class="viz-legend">
+            <div class="viz-legend-item"><div class="viz-dot" style="background:var(--accent3)"></div> Critical</div>
+            <div class="viz-legend-item"><div class="viz-dot" style="background:var(--accent4)"></div> High</div>
+            <div class="viz-legend-item"><div class="viz-dot" style="background:var(--accent)"></div> Medium</div>
+            <div class="viz-legend-item"><div class="viz-dot" style="background:var(--accent2)"></div> Low</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#main -->
+
+  <div id="statusbar">
+    <div class="status-dot"></div>
+    <span id="status-msg">Ready — Set target domain and begin reconnaissance</span>
+    <div class="status-right">
+      <span id="status-time"></span>
+      <span>DORK//ENGINE v4.0</span>
+      <span>⚠ AUTHORIZED USE ONLY</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const DORK_DB = {
+  "📁 File Exposure":{ color:"#00ffc8", threat:"HIGH", dorks:[
+    {label:"PDF Documents",   template:"site:{target} filetype:pdf",                                    risk:"medium",   tags:["files","docs"]},
+    {label:"Excel Sheets",    template:"site:{target} filetype:xlsx OR filetype:xls",                  risk:"high",     tags:["files","data"]},
+    {label:"Word Documents",  template:"site:{target} filetype:docx OR filetype:doc",                  risk:"medium",   tags:["files","docs"]},
+    {label:"Config Files",    template:"site:{target} filetype:env OR filetype:cfg OR filetype:ini",   risk:"critical", tags:["config","secrets"]},
+    {label:"SQL Dumps",       template:"site:{target} filetype:sql",                                    risk:"critical", tags:["database"]},
+    {label:"Log Files",       template:"site:{target} filetype:log",                                    risk:"high",     tags:["logs"]},
+    {label:"Backup Files",    template:"site:{target} filetype:bak OR filetype:backup OR filetype:old", risk:"critical", tags:["backup"]},
+    {label:"CSV Data",        template:"site:{target} filetype:csv",                                    risk:"high",     tags:["data"]},
+    {label:"YAML Configs",    template:"site:{target} filetype:yaml OR filetype:yml",                  risk:"critical", tags:["config","devops"]},
+    {label:"XML Configs",     template:"site:{target} filetype:xml inurl:config",                      risk:"high",     tags:["config"]},
+    {label:"JSON Data",       template:"site:{target} filetype:json inurl:api OR inurl:data",          risk:"high",     tags:["api","data"]},
+    {label:"PHP Source",      template:"site:{target} filetype:php inurl:source OR inurl:backup",      risk:"critical", tags:["code","php"]},
+  ]},
+  "🔐 Auth & Admin":{ color:"#ff4d6d", threat:"CRITICAL", dorks:[
+    {label:"Admin Panels",     template:"site:{target} inurl:admin OR inurl:administrator OR inurl:wp-admin",  risk:"critical", tags:["admin","auth"]},
+    {label:"Login Pages",      template:"site:{target} inurl:login OR inurl:signin OR inurl:sso",             risk:"high",     tags:["auth"]},
+    {label:"phpMyAdmin",       template:"site:{target} inurl:phpmyadmin",                                     risk:"critical", tags:["database","admin"]},
+    {label:"cPanel",           template:"site:{target} inurl:2082 OR inurl:2083 OR inurl:cpanel",             risk:"critical", tags:["admin","hosting"]},
+    {label:"Dashboards",       template:"site:{target} inurl:dashboard OR inurl:portal OR inurl:console",     risk:"high",     tags:["admin"]},
+    {label:"Jenkins CI",       template:`site:{target} inurl:jenkins OR intitle:"Dashboard [Jenkins]"`,       risk:"critical", tags:["devops","ci"]},
+    {label:"Grafana",          template:`site:{target} inurl:grafana OR intitle:"Grafana"`,                   risk:"high",     tags:["monitoring"]},
+    {label:"Kibana",           template:`site:{target} inurl:kibana OR intitle:"Kibana"`,                     risk:"high",     tags:["monitoring"]},
+    {label:"Jira/Confluence",  template:`site:{target} inurl:jira OR inurl:confluence`,                       risk:"medium",   tags:["devops","wiki"]},
+    {label:"GitLab/GitHub",    template:`site:{target} inurl:gitlab OR inurl:github`,                         risk:"medium",   tags:["code","vcs"]},
+  ]},
+  "🗝️ Secrets & Creds":{ color:"#fbbf24", threat:"CRITICAL", dorks:[
+    {label:"Passwords in Text",  template:"site:{target} intext:password OR intext:passwd filetype:txt OR filetype:log",  risk:"critical", tags:["secrets"]},
+    {label:"API Keys",           template:`site:{target} intext:"api_key" OR intext:"apikey" OR intext:"access_token"`,   risk:"critical", tags:["secrets","api"]},
+    {label:"Private Keys",       template:`site:{target} intext:"BEGIN RSA PRIVATE KEY" OR intext:"BEGIN OPENSSH"`,       risk:"critical", tags:["crypto"]},
+    {label:"AWS Credentials",    template:`site:{target} intext:"AWS_SECRET_ACCESS_KEY" OR intext:"AKIA"`,                risk:"critical", tags:["cloud","aws"]},
+    {label:"DB Connections",     template:`site:{target} intext:"mongodb://" OR intext:"mysql://" OR intext:"postgresql://"`, risk:"critical", tags:["database"]},
+    {label:"JWT Tokens",         template:`site:{target} intext:"eyJhbGciOi" filetype:log OR filetype:txt`,               risk:"critical", tags:["auth","tokens"]},
+    {label:"GitHub Tokens",      template:`site:{target} intext:"ghp_" OR intext:"GITHUB_TOKEN"`,                         risk:"critical", tags:["secrets","github"]},
+    {label:"Slack Webhooks",     template:`site:{target} intext:"hooks.slack.com/services"`,                              risk:"high",     tags:["secrets","slack"]},
+    {label:"Stripe Keys",        template:`site:{target} intext:"sk_live_" OR intext:"pk_live_"`,                         risk:"critical", tags:["payment","stripe"]},
+    {label:"Twilio Tokens",      template:`site:{target} intext:"AC" intext:"twilio" intext:"auth_token"`,                risk:"critical", tags:["secrets","twilio"]},
+  ]},
+  "📂 Open Directories":{ color:"#a78bfa", threat:"HIGH", dorks:[
+    {label:"Root Index",       template:`site:{target} intitle:"index of /"`,                  risk:"high",     tags:["directory"]},
+    {label:"Parent Directory", template:`site:{target} intitle:"index of" "parent directory"`, risk:"high",     tags:["directory"]},
+    {label:"Uploads Folder",   template:`site:{target} intitle:"index of" "uploads"`,          risk:"high",     tags:["directory","uploads"]},
+    {label:"Backup Dirs",      template:`site:{target} intitle:"index of" "backup"`,           risk:"critical", tags:["directory","backup"]},
+    {label:"Temp/Cache",       template:`site:{target} intitle:"index of" "tmp" OR "temp"`,    risk:"medium",   tags:["directory"]},
+    {label:"Git Repo",         template:`site:{target} intitle:"index of" ".git"`,             risk:"critical", tags:["directory","git"]},
+    {label:"Node Modules",     template:`site:{target} intitle:"index of" "node_modules"`,     risk:"high",     tags:["directory","node"]},
+    {label:"Docker Volumes",   template:`site:{target} intitle:"index of" ".docker"`,          risk:"critical", tags:["directory","docker"]},
+  ]},
+  "⚙️ Tech Fingerprint":{ color:"#38bdf8", threat:"MEDIUM", dorks:[
+    {label:"WordPress",       template:"site:{target} inurl:wp-content OR inurl:wp-includes",                         risk:"medium",   tags:["cms","wordpress"]},
+    {label:"SQL Errors",      template:`site:{target} intext:"sql syntax" OR intext:"mysql error" OR intext:"ORA-"`,  risk:"high",     tags:["errors","database"]},
+    {label:"Stack Traces",    template:`site:{target} intext:"stack trace" OR intext:"traceback"`,                    risk:"medium",   tags:["errors"]},
+    {label:"phpinfo",         template:`site:{target} inurl:phpinfo.php OR intitle:"phpinfo()"`,                      risk:"high",     tags:["php"]},
+    {label:"Exposed .env",    template:"site:{target} inurl:.env -github",                                            risk:"critical", tags:["config","secrets"]},
+    {label:"Swagger UI",      template:`site:{target} inurl:swagger OR intitle:"Swagger UI"`,                        risk:"medium",   tags:["api","docs"]},
+    {label:"GraphQL",         template:"site:{target} inurl:graphql OR inurl:graphiql",                               risk:"medium",   tags:["api"]},
+    {label:"Struts/Spring",   template:`site:{target} intext:"struts" OR intext:"springframework"`,                   risk:"low",      tags:["java","framework"]},
+    {label:"Laravel Debug",   template:`site:{target} intext:"APP_DEBUG=true" OR intitle:"Laravel"`,                 risk:"high",     tags:["php","laravel"]},
+    {label:"Django Debug",    template:`site:{target} intitle:"Django" intext:"DEBUG" intext:"True"`,                risk:"high",     tags:["python","django"]},
+  ]},
+  "☁️ Cloud & Infra":{ color:"#fb923c", threat:"HIGH", dorks:[
+    {label:"S3 Buckets",          template:`site:s3.amazonaws.com "{target}"`,                               risk:"high",     tags:["cloud","aws","s3"]},
+    {label:"Azure Blobs",         template:`site:blob.core.windows.net "{target}"`,                          risk:"high",     tags:["cloud","azure"]},
+    {label:"GCP Storage",         template:`site:storage.googleapis.com "{target}"`,                         risk:"high",     tags:["cloud","gcp"]},
+    {label:"Heroku Apps",         template:`site:herokuapp.com "{target}"`,                                  risk:"medium",   tags:["cloud","heroku"]},
+    {label:"Exposed Docker",      template:"site:{target} inurl:2375 OR inurl:2376",                         risk:"critical", tags:["docker","infra"]},
+    {label:"Kubernetes",          template:`site:{target} intitle:"Kubernetes Dashboard"`,                   risk:"critical", tags:["k8s","infra"]},
+    {label:"Terraform State",     template:"site:{target} filetype:tfstate",                                 risk:"critical", tags:["terraform","infra"]},
+    {label:"Ansible Playbooks",   template:"site:{target} filetype:yml intext:hosts intext:tasks",           risk:"high",     tags:["ansible","infra"]},
+    {label:"GitHub Actions",      template:"site:{target} inurl:.github/workflows filetype:yml",             risk:"medium",   tags:["github","ci"]},
+  ]},
+  "🕵️ Social & OSINT":{ color:"#34d399", threat:"MEDIUM", dorks:[
+    {label:"Email Addresses",    template:`site:{target} intext:"@{target}" filetype:txt OR filetype:csv`,   risk:"medium",   tags:["email","osint"]},
+    {label:"LinkedIn Employees", template:`site:linkedin.com/in "{target}"`,                                 risk:"low",      tags:["social","people"]},
+    {label:"Confidential Docs",  template:`site:{target} intext:"internal use only" OR intext:"confidential"`, risk:"high",  tags:["docs"]},
+    {label:"Pastebin Leaks",     template:`site:pastebin.com "{target}"`,                                    risk:"high",     tags:["paste","leaks"]},
+    {label:"GitHub Secrets",     template:`site:github.com "{target}" password OR secret OR key OR token`,  risk:"critical", tags:["github","secrets"]},
+    {label:"Job Postings",       template:`site:linkedin.com OR site:indeed.com "{target}" developer OR engineer`, risk:"low", tags:["osint","jobs"]},
+    {label:"News Mentions",      template:`"{target}" inurl:news OR inurl:press -site:{target}`,             risk:"low",      tags:["osint","news"]},
+    {label:"Dark Web Mentions",  template:`site:reddit.com OR site:hackforums.net "{target}"`,               risk:"high",     tags:["osint","darkweb"]},
+  ]},
+};
+
+const OPERATORS = [
+  {op:"site:",     desc:"Restrict results to a specific domain or URL",  example:"site:example.com"},
+  {op:"inurl:",    desc:"Page URL must contain this text",               example:"inurl:admin"},
+  {op:"intitle:",  desc:"Page title must contain this text",             example:'intitle:"index of"'},
+  {op:"intext:",   desc:"Page body must contain this text",              example:"intext:password"},
+  {op:"filetype:", desc:"Results of a specific file type",               example:"filetype:pdf"},
+  {op:"ext:",      desc:"File extension (alias for filetype)",           example:"ext:sql"},
+  {op:"cache:",    desc:"Show Google's cached version of a page",        example:"cache:example.com"},
+  {op:"related:",  desc:"Find sites similar to a given URL",             example:"related:example.com"},
+  {op:'""',        desc:"Exact phrase — must match verbatim",            example:'"exact phrase"'},
+  {op:"OR",        desc:"Logical OR between two terms",                  example:"pdf OR doc"},
+  {op:"-",         desc:"Exclude term from results",                     example:"-github"},
+  {op:"*",         desc:"Wildcard — matches any word",                   example:"admin*login"},
+  {op:"before:",   desc:"Results indexed before a date",                 example:"before:2023-01-01"},
+  {op:"after:",    desc:"Results indexed after a date",                  example:"after:2020-01-01"},
+  {op:"link:",     desc:"Pages that link to a URL",                      example:"link:example.com"},
+  {op:"info:",     desc:"Info about a URL or domain",                    example:"info:example.com"},
+];
+
+const COMBOS = [
+  {label:"Login + Password Exposure",  query:'site:{target} inurl:login intext:"password"',      risk:"critical"},
+  {label:"SQL Error + Admin Path",     query:'site:{target} intext:"sql error" inurl:admin',     risk:"critical"},
+  {label:"Index of + Sensitive Files", query:'site:{target} intitle:"index of" (sql OR bak OR env OR key)', risk:"critical"},
+  {label:"Open Config + API Key",      query:'site:{target} filetype:env intext:"api"',           risk:"critical"},
+  {label:"S3 Bucket + Target Name",   query:'site:s3.amazonaws.com "{target}" filetype:json',    risk:"high"},
+  {label:"GitHub + Credentials",      query:'site:github.com "{target}" password OR token filetype:env', risk:"critical"},
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let results = [], chain = [], saved = [], customDorks = [];
+let currentCategory = null, currentFilter = 'all', searchRiskFilter = 'all';
+let exportFmt = 'txt', aiDorks = [], builderChips = [];
+let darkTheme = true;
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
+
+function getTarget(){ return ($('target-input').value.trim().replace(/^https?:\/\//,'')||'example.com').replace(/\/$/,''); }
+function resolve(tpl){ return tpl.replace(/{target}/g, getTarget()); }
+function googleUrl(q){ return 'https://www.google.com/search?q='+encodeURIComponent(q); }
+function riskClass(r){ return 'risk risk-'+r; }
+function riskBadge(r){ return `<span class="${riskClass(r)}">${r.toUpperCase()}</span>`; }
+function ts(){ return new Date().toLocaleTimeString(); }
+function uid(){ return Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+
+function toast(msg, type='info', dur=3000){
+  const c = $('toast-container');
+  const d = document.createElement('div');
+  d.className = `toast ${type}`;
+  d.innerHTML = `<span>${{success:'✓',error:'✗',info:'ℹ'}[type]||'ℹ'}</span><span>${msg}</span>`;
+  c.appendChild(d);
+  setTimeout(()=>{ d.classList.add('out'); setTimeout(()=>d.remove(),300); }, dur);
+}
+
+function setStatus(msg){ $('status-msg').textContent = msg; }
+
+function updateStats(){
+  $('stat-total').textContent = results.length;
+  $('stat-crit').textContent  = results.filter(r=>r.risk==='critical').length;
+  $('stat-chain').textContent = chain.length;
+  $('stat-saved').textContent = saved.length;
+  $('results-count').textContent = `${results.length} queries`;
+  $('chain-badge').textContent = chain.length+' dorks queued';
+}
+
+function copyText(text){
+  navigator.clipboard.writeText(text).then(()=>toast('Copied to clipboard','success')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Copied','success');
+  });
+}
+
+function openModal(title, bodyHtml){
+  $('modal-title').textContent = title;
+  $('modal-body').innerHTML = bodyHtml;
+  $('modal').classList.add('active');
+}
+function closeModal(){ $('modal').classList.remove('active'); }
+$('modal').addEventListener('click', e=>{ if(e.target===$('modal')) closeModal(); });
+
+// ═══════════════════════════════════════════════════════════════════
+// BACKGROUND CANVAS
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  const canvas = $('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles=[], drops=[];
+  function resize(){
+    W=canvas.width=window.innerWidth;
+    H=canvas.height=window.innerHeight;
+    drops = Array.from({length:Math.floor(W/18)},()=>Math.random()*H/16);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  const chars='ァイウエオカキクケコ0123456789ABCDEF><{}[]';
+  function frame(){
+    ctx.fillStyle='rgba(5,7,9,0.06)';
+    ctx.fillRect(0,0,W,H);
+    ctx.font='12px monospace';
+    drops.forEach((y,i)=>{
+      const alpha = Math.random()*.15+.03;
+      ctx.fillStyle=`rgba(0,229,255,${alpha})`;
+      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*18,y*16);
+      if(y*16>H&&Math.random()>.978) drops[i]=0;
+      drops[i]++;
+    });
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(id, btn){
+  $$('.tab-panel').forEach(p=>p.classList.remove('active'));
+  $$('.tab-btn').forEach(b=>b.classList.remove('active'));
+  $('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='search') doSearch();
+  if(id==='export') refreshExportPreview();
+  if(id==='viz'){ drawRadar(); updateVizStats(); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GENERATOR
+// ═══════════════════════════════════════════════════════════════════
+function buildCatList(){
+  const el = $('cat-list');
+  el.innerHTML='';
+  Object.entries(DORK_DB).forEach(([name,cat])=>{
+    const div = document.createElement('div');
+    div.className='cat-item';
+    div.innerHTML=`<span>${name}</span><span class="cat-threat threat-${cat.threat}">${cat.threat}</span>`;
+    div.onclick=()=>selectCategory(name,div);
+    el.appendChild(div);
+  });
+}
+
+function selectCategory(name, el){
+  currentCategory = name;
+  $$('.cat-item').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const cat = DORK_DB[name];
+  $('dork-pane-title').textContent = name.toUpperCase();
+  const list = $('dork-list');
+  list.innerHTML='';
+  cat.dorks.forEach((d,i)=>{
+    const div = document.createElement('div');
+    div.className='dork-item';
+    div.innerHTML=`
+      <div class="dork-item-header">
+        <span class="dork-item-label">${d.label}</span>
+        ${riskBadge(d.risk)}
+        <div class="dork-item-actions">
+          <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();executeDork(DORK_DB['${CSS.escape(name)}'].dorks[${i}],'${CSS.escape(name)}')">▶</button>
+          <button class="btn btn-warn btn-xs" onclick="event.stopPropagation();addToChain(DORK_DB['${CSS.escape(name)}'].dorks[${i}],'${CSS.escape(name)}')">⛓</button>
+        </div>
+      </div>
+      <div class="dork-item-preview">${d.template.replace(/{target}/g,getTarget())}</div>
+      <div class="dork-item-tags">${d.tags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+    `;
+    div.addEventListener('click', ()=>executeDork(d, name));
+    list.appendChild(div);
+  });
+  setStatus(`Category: ${name} — ${cat.dorks.length} dorks available`);
+}
+
+function executeDork(d, category, queryOverride){
+  const q = queryOverride || resolve(d.template);
+  const entry = {
+    id: uid(), label:d.label, query:q,
+    url: googleUrl(q), risk:d.risk||'medium',
+    category, target:getTarget(), time:ts()
+  };
+  results.push(entry);
+  updateStats();
+  renderResult(entry);
+  setStatus(`▶ Executed: ${d.label} — ${entry.target}`);
+  return entry;
+}
+
+function renderResult(entry){
+  const list = $('results-list');
+  const empty = list.querySelector('.empty-state');
+  if(empty) empty.remove();
+  if(currentFilter!=='all' && entry.risk!==currentFilter) return;
+  const div = document.createElement('div');
+  div.className = `result-card risk-${entry.risk}`;
+  div.id = 'result-'+entry.id;
+  div.innerHTML=`
+    <div class="result-card-header">
+      <span class="result-idx">#${results.length}</span>
+      ${riskBadge(entry.risk)}
+      <span class="result-label">${entry.label}</span>
+      <span class="result-time">${entry.time}</span>
+    </div>
+    <div class="result-query copyable" onclick="copyText('${entry.query.replace(/'/g,"\\'")}')">
+      ${entry.query}
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-primary btn-xs" onclick="window.open('${entry.url}','_blank')">↗ OPEN</button>
+      <button class="btn btn-ghost btn-xs" onclick="copyText('${entry.query.replace(/'/g,"\\'")}')">⎘ QUERY</button>
+      <button class="btn btn-ghost btn-xs" onclick="copyText('${entry.url.replace(/'/g,"\\'")}')">⎘ URL</button>
+      <button class="btn btn-ghost btn-xs" onclick="addToSaved(results.find(r=>r.id==='${entry.id}'))">♥ SAVE</button>
+      <button class="btn btn-warn btn-xs" onclick="addToChain({label:'${entry.label}',template:'${entry.query.replace(/'/g,"\\'")}',risk:'${entry.risk}',tags:[]},'${entry.category}')">⛓</button>
+      <button class="btn btn-ghost btn-xs" onclick="showResultDetail('${entry.id}')">⋯ MORE</button>
+      <span class="result-cat">${entry.category}</span>
+    </div>
+  `;
+  list.insertBefore(div, list.firstChild);
+  list.scrollTop=0;
+}
+
+function setFilter(f, el){
+  currentFilter = f;
+  $$('.filter-chip').forEach(c=>{ if(c.closest('#results-list')||c.closest('.results-header')) c.classList.remove('active'); });
+  el.classList.add('active');
+  refreshResultsView();
+}
+
+function refreshResultsView(){
+  const list = $('results-list');
+  list.innerHTML='';
+  const filtered = currentFilter==='all' ? results : results.filter(r=>r.risk===currentFilter);
+  if(!filtered.length){ list.innerHTML='<div class="empty-state"><div class="empty-icon">⬚</div><div class="empty-text">NO MATCHING RESULTS</div></div>'; return; }
+  [...filtered].reverse().forEach(renderResult);
+}
+
+function runAllCurrent(){
+  if(!currentCategory){ toast('Select a category first','error'); return; }
+  const cat = DORK_DB[currentCategory];
+  cat.dorks.forEach(d=>executeDork(d,currentCategory));
+  toast(`▶ Ran ${cat.dorks.length} dorks for ${getTarget()}`, 'success');
+}
+
+function chainAllCurrent(){
+  if(!currentCategory) return;
+  DORK_DB[currentCategory].dorks.forEach(d=>addToChain(d,currentCategory));
+  toast(`⛓ ${DORK_DB[currentCategory].dorks.length} dorks added to chain`,'success');
+}
+
+function clearResults(){
+  if(!confirm('Clear all results?')) return;
+  results=[];
+  $('results-list').innerHTML='<div class="empty-state"><div class="empty-icon">⬚</div><div class="empty-text">RESULTS CLEARED</div></div>';
+  updateStats();
+  toast('Results cleared','info');
+}
+
+function openAllInBrowser(){
+  const toOpen = (currentFilter==='all'?results:results.filter(r=>r.risk===currentFilter)).slice(-15);
+  toOpen.forEach((r,i)=>setTimeout(()=>window.open(r.url,'_blank'),i*200));
+  toast(`↗ Opening ${toOpen.length} tabs`,'info');
+}
+
+function saveAll(){
+  results.forEach(r=>{ if(!saved.find(s=>s.id===r.id)) saved.push(r); });
+  updateStats();
+  toast(`♥ Saved ${results.length} results`,'success');
+}
+
+function addToSaved(entry){
+  if(!entry) return;
+  if(saved.find(s=>s.id===entry.id)){ toast('Already saved','info'); return; }
+  saved.push(entry);
+  updateStats();
+  toast('♥ Saved','success');
+}
+
+function openSavedPanel(){
+  const body = saved.length ? saved.map(r=>`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">${riskBadge(r.risk)}<strong style="color:var(--fg3)">${r.label}</strong></div>
+      <div style="font-size:11px;color:var(--fg);margin-bottom:6px;font-family:var(--font-mono)">${r.query}</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-xs" onclick="window.open('${r.url}','_blank')">↗ OPEN</button>
+        <button class="btn btn-ghost btn-xs" onclick="copyText('${r.query.replace(/'/g,"\\'")}')">⎘ COPY</button>
+      </div>
+    </div>`).join('') : '<div style="color:var(--fg);font-size:12px;opacity:.5">No saved dorks yet</div>';
+  openModal(`♥ SAVED DORKS (${saved.length})`, body);
+}
+
+function showResultDetail(id){
+  const r = results.find(x=>x.id===id); if(!r) return;
+  openModal('QUERY DETAILS', `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">${riskBadge(r.risk)}<strong style="color:var(--fg3);font-size:13px">${r.label}</strong></div>
+    <div style="font-size:10px;color:var(--fg);letter-spacing:2px;margin-bottom:4px">QUERY</div>
+    <div class="modal-url">${r.query}</div>
+    <div style="font-size:10px;color:var(--fg);letter-spacing:2px;margin-bottom:4px">SEARCH URL</div>
+    <div class="modal-url" style="word-break:break-all;font-size:10px">${r.url}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;font-size:11px">
+      <div><span style="color:var(--fg)">Category: </span><span style="color:var(--fg2)">${r.category}</span></div>
+      <div><span style="color:var(--fg)">Target: </span><span style="color:var(--accent2)">${r.target}</span></div>
+      <div><span style="color:var(--fg)">Time: </span><span style="color:var(--fg2)">${r.time}</span></div>
+      <div><span style="color:var(--fg)">Risk: </span>${riskBadge(r.risk)}</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:14px">
+      <button class="btn btn-primary btn-sm" onclick="window.open('${r.url}','_blank')">↗ Open in Google</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${r.query.replace(/'/g,"\\'")}')">⎘ Copy Query</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${r.url.replace(/'/g,"\\'")}')">⎘ Copy URL</button>
+    </div>
+  `);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════════════════
+let allDorks=[], sortKey='default';
+function buildAllDorks(){
+  allDorks=[];
+  Object.entries(DORK_DB).forEach(([cat,data])=>data.dorks.forEach(d=>allDorks.push({...d,category:cat})));
+}
+function doSearch(){
+  const kw = ($('search-input').value||'').toLowerCase().trim();
+  const rf = searchRiskFilter;
+  let filtered = allDorks.filter(d=>{
+    const hay = `${d.label} ${d.template} ${d.risk} ${d.tags.join(' ')} ${d.category}`.toLowerCase();
+    return (!kw||hay.includes(kw)) && (rf==='all'||d.risk===rf);
+  });
+  const sv = $('sort-select').value;
+  const riskOrder = {critical:0,high:1,medium:2,low:3};
+  if(sv==='risk-asc') filtered.sort((a,b)=>riskOrder[a.risk]-riskOrder[b.risk]);
+  else if(sv==='risk-desc') filtered.sort((a,b)=>riskOrder[b.risk]-riskOrder[a.risk]);
+  else if(sv==='name') filtered.sort((a,b)=>a.label.localeCompare(b.label));
+  $('search-stats').textContent = `${filtered.length} dork(s) found${kw?' for "'+kw+'"':''}`;
+  const tb = $('search-tbody'); tb.innerHTML='';
+  filtered.forEach((d,i)=>{
+    const tr = document.createElement('tr');
+    tr.className = i%2===0?'highlight-row':'';
+    const resolved = d.template.replace(/{target}/g,getTarget());
+    tr.innerHTML=`
+      <td class="td-risk">${riskBadge(d.risk)}</td>
+      <td class="td-label">${d.label}</td>
+      <td class="td-cat">${d.category}</td>
+      <td class="td-template" title="${d.template}">${resolved}</td>
+      <td class="td-actions">
+        <button class="btn btn-primary btn-xs" onclick="executeDork(allDorks[${allDorks.indexOf(d)}],'${d.category}')">▶</button>
+        <button class="btn btn-warn btn-xs" onclick="addToChain(allDorks[${allDorks.indexOf(d)}],'${d.category}')">⛓</button>
+        <button class="btn btn-ghost btn-xs" onclick="copyText('${resolved.replace(/'/g,"\\'")}')">⎘</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  window._searchFiltered = filtered;
+}
+function setSearchRisk(r,el){ searchRiskFilter=r; $$('#search-risk-filters .filter-chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); doSearch(); }
+function runAllSearch(){ (window._searchFiltered||[]).forEach(d=>executeDork(d,d.category)); toast(`▶ Ran ${(window._searchFiltered||[]).length} dorks`,'success'); }
+function chainAllSearch(){ (window._searchFiltered||[]).forEach(d=>addToChain(d,d.category)); toast(`⛓ ${(window._searchFiltered||[]).length} dorks chained`,'success'); updateStats(); }
+function sortTable(k){ sortKey=k; doSearch(); }
+
+// ═══════════════════════════════════════════════════════════════════
+// CHAIN
+// ═══════════════════════════════════════════════════════════════════
+function addToChain(d, category){
+  chain.push({...d, category, _id:uid()});
+  updateStats();
+  refreshChainView();
+  setStatus(`⛓ Added to chain: ${d.label}`);
+}
+
+function refreshChainView(){
+  const list = $('chain-list');
+  if(!chain.length){
+    list.innerHTML='<div class="chain-empty"><div style="font-size:36px;opacity:.3">⛓</div><div>CHAIN IS EMPTY</div><div style="font-size:10px;opacity:.6">Add dorks using the ⛓ button in Generator or Search</div></div>';
+    return;
+  }
+  list.innerHTML='';
+  chain.forEach((d,i)=>{
+    const div = document.createElement('div');
+    div.className='chain-item';
+    const resolved = d.template.replace(/{target}/g,getTarget());
+    div.innerHTML=`
+      <div class="chain-num">#${i+1}</div>
+      ${riskBadge(d.risk||'medium')}
+      <div class="chain-item-info">
+        <div class="chain-item-label">${d.label}</div>
+        <div class="chain-item-query">${resolved}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-primary btn-xs" onclick="executeDork(chain[${i}],chain[${i}].category||'Chain')">▶</button>
+        <button class="btn btn-ghost btn-xs" onclick="copyText('${resolved.replace(/'/g,"\\'")}')">⎘</button>
+        <button class="btn btn-danger btn-xs" onclick="removeChainItem(${i})">✕</button>
+      </div>`;
+    list.appendChild(div);
+  });
+  updateStats();
+}
+
+async function runChain(){
+  if(!chain.length){ toast('Chain is empty','error'); return; }
+  const prog = $('chain-progress');
+  const fill = $('chain-prog-fill');
+  const txt  = $('chain-prog-text');
+  prog.style.display='block';
+  for(let i=0;i<chain.length;i++){
+    fill.style.width = ((i+1)/chain.length*100)+'%';
+    txt.textContent = `${i+1} / ${chain.length}`;
+    executeDork(chain[i], chain[i].category||'Chain');
+    await new Promise(r=>setTimeout(r,120));
+  }
+  setTimeout(()=>{ prog.style.display='none'; fill.style.width='0%'; },1500);
+  toast(`⛓ Chain executed: ${chain.length} dorks ran`,'success');
+}
+
+function removeChainItem(i){ chain.splice(i,1); refreshChainView(); updateStats(); }
+function clearChain(){ if(confirm('Clear chain?')){ chain=[]; refreshChainView(); updateStats(); } }
+
+function exportChain(){
+  const content = chain.map(d=>`[${(d.risk||'medium').toUpperCase()}] ${d.label}\n${d.template.replace(/{target}/g,getTarget())}\n`).join('\n');
+  downloadFile(content,'dork-chain.txt','text/plain');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AI GENERATOR
+// ═══════════════════════════════════════════════════════════════════
+function toggleAiKey(){ const i=$('ai-key'); i.type=i.type==='password'?'text':'password'; }
+function setAiPrompt(p){ $('ai-prompt').value=p; }
+
+async function runAI(){
+  const key = $('ai-key').value.trim();
+  const prompt = $('ai-prompt').value.trim();
+  const count = $('ai-count').value;
+  if(!key){ toast('Anthropic API key required','error'); return; }
+  if(!prompt){ toast('Enter a recon objective first','error'); return; }
+  $('ai-thinking').classList.add('active');
+  $('ai-results').innerHTML='';
+  $('ai-status').textContent='Querying Claude AI...';
+  $('ai-count-badge').textContent='';
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:2000,
+        messages:[{role:'user',content:`You are a senior OSINT expert and penetration tester. Generate exactly ${count} advanced Google dork queries for this recon objective: "${prompt}".\n\nTarget domain placeholder: {target} (use literally as {target}).\n\nReturn ONLY a valid JSON array with no markdown, no backticks, no explanation:\n[{"label":"Short descriptive name","query":"full dork here with {target}","risk":"critical|high|medium|low","explanation":"one sentence explaining what this finds and why it's useful"}]`}]
+      })
+    });
+    const data=await res.json();
+    let text=(data.content?.[0]?.text||'').trim().replace(/```json|```/g,'').trim();
+    aiDorks=JSON.parse(text);
+    $('ai-thinking').classList.remove('active');
+    $('ai-count-badge').textContent=`${aiDorks.length} dorks generated`;
+    $('ai-status').textContent=`✦ ${aiDorks.length} dorks ready`;
+    renderAiResults();
+    toast(`✦ Claude generated ${aiDorks.length} dorks`,'success');
+  }catch(e){
+    $('ai-thinking').classList.remove('active');
+    $('ai-status').textContent=`✗ Error: ${e.message}`;
+    toast('AI request failed: '+e.message,'error',5000);
+  }
+}
+
+function renderAiResults(){
+  const list=$('ai-results'); list.innerHTML='';
+  aiDorks.forEach((d,i)=>{
+    const q=d.query.replace(/{target}/g,getTarget());
+    const card=document.createElement('div');
+    card.className='ai-result-card';
+    card.innerHTML=`
+      <div class="ai-result-header">
+        <span style="font-size:10px;color:var(--accent5);font-family:var(--font-mono)">#${i+1}</span>
+        ${riskBadge(d.risk||'medium')}
+        <span class="ai-result-label">${d.label}</span>
+        <span class="badge badge-ai" style="font-size:8px">AI</span>
+      </div>
+      <div class="ai-result-query">${q}</div>
+      ${d.explanation?`<div class="ai-result-explanation">// ${d.explanation}</div>`:''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ai btn-xs" onclick="executeDork({label:'${d.label.replace(/'/g,"\\'")}',template:'${d.query.replace(/'/g,"\\'")}',risk:'${d.risk||'medium'}',tags:[]},'AI Generated')">▶ RUN</button>
+        <button class="btn btn-warn btn-xs" onclick="addToChain({label:'${d.label.replace(/'/g,"\\'")}',template:'${d.query.replace(/'/g,"\\'")}',risk:'${d.risk||'medium'}',tags:[]},'AI Generated')">⛓ CHAIN</button>
+        <button class="btn btn-ghost btn-xs" onclick="copyText('${q.replace(/'/g,"\\'")}')">⎘ COPY</button>
+        <button class="btn btn-ghost btn-xs" onclick="window.open('${googleUrl(q)}','_blank')">↗ SEARCH</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function runAllAI(){ aiDorks.forEach(d=>executeDork({label:d.label,template:d.query,risk:d.risk||'medium',tags:[]},'AI Generated')); toast(`▶ Ran ${aiDorks.length} AI dorks`,'success'); }
+function chainAllAI(){ aiDorks.forEach(d=>addToChain({label:d.label,template:d.query,risk:d.risk||'medium',tags:[]},'AI Generated')); toast(`⛓ ${aiDorks.length} AI dorks chained`,'success'); }
+
+// ═══════════════════════════════════════════════════════════════════
+// OPERATORS
+// ═══════════════════════════════════════════════════════════════════
+function buildOpsList(){
+  const el=$('ops-list'); el.innerHTML='';
+  OPERATORS.forEach(op=>{
+    const div=document.createElement('div');
+    div.className='op-card';
+    div.innerHTML=`<span class="op-code">${op.op}</span><div><div class="op-desc">${op.desc}</div><div class="op-example">${op.example}</div></div>`;
+    div.onclick=()=>{ $('builder-op').value=op.op; updateBuilderPreview(); };
+    el.appendChild(div);
+  });
+  const combos=$('combo-list');
+  COMBOS.forEach(c=>{
+    const div=document.createElement('div');
+    div.className='op-card';
+    div.style.cursor='pointer';
+    const q=c.query.replace(/{target}/g,getTarget());
+    div.innerHTML=`<div>${riskBadge(c.risk)}</div><div class="op-desc">${c.label}<div class="op-example">${q}</div></div>
+      <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();executeDork({label:'${c.label.replace(/'/g,"\\'")}',template:'${c.query.replace(/'/g,"\\'")}',risk:'${c.risk}',tags:[]},'Combination')">▶</button>`;
+    combos.appendChild(div);
+  });
+}
+
+function updateBuilderPreview(){
+  const op=$('builder-op').value, val=$('builder-val').value.trim(), extra=$('builder-extra').value.trim();
+  const chips = builderChips.join(' ');
+  const part = op&&val ? `${op}${val.includes(' ')&&!val.startsWith('"')?'"'+val+'"':val}` : '';
+  const full = [chips,part,extra].filter(Boolean).join(' ').trim();
+  $('builder-preview').textContent = full||'Your query will appear here...';
+}
+
+function addBuilderChip(){
+  const op=$('builder-op').value, val=$('builder-val').value.trim();
+  if(!op||!val) return;
+  const chip = `${op}${val.includes(' ')&&!val.startsWith('"')?'"'+val+'"':val}`;
+  builderChips.push(chip);
+  $('builder-val').value='';
+  renderBuilderChips();
+  updateBuilderPreview();
+}
+
+function renderBuilderChips(){
+  const el=$('builder-chips'); el.innerHTML='';
+  builderChips.forEach((c,i)=>{
+    const span=document.createElement('span');
+    span.style.cssText='background:var(--bg3);border:1px solid var(--accent2);color:var(--accent2);padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer;font-family:var(--font-mono)';
+    span.innerHTML=`${c} <span onclick="builderChips.splice(${i},1);renderBuilderChips();updateBuilderPreview()" style="color:var(--accent3);margin-left:4px">✕</span>`;
+    el.appendChild(span);
+  });
+}
+
+function getBuilderQuery(){ return $('builder-preview').textContent.replace('Your query will appear here...','').trim(); }
+function runBuilderQuery(){ const q=getBuilderQuery(); if(!q)return; executeDork({label:'Builder Query',template:q,risk:'medium',tags:[]},'Builder'); }
+function chainBuilderQuery(){ const q=getBuilderQuery(); if(!q)return; addToChain({label:'Builder Query',template:q,risk:'medium',tags:[]},'Builder'); }
+function copyBuilderQuery(){ copyText(getBuilderQuery()); }
+function clearBuilder(){ builderChips=[]; $('builder-op').value=''; $('builder-val').value=''; $('builder-extra').value=''; renderBuilderChips(); updateBuilderPreview(); }
+
+// ═══════════════════════════════════════════════════════════════════
+// CUSTOM BUILDER
+// ═══════════════════════════════════════════════════════════════════
+function updateCbPreview(){
+  const t=$('cb-template').value; $('cb-preview').textContent=resolve(t)||'Your query will appear here...';
+}
+
+function getCustomDork(){
+  const label=$('cb-label').value.trim()||'Custom Dork';
+  const risk=$('cb-risk').value;
+  const category=$('cb-category').value.trim()||'Custom';
+  const template=$('cb-template').value.trim();
+  const tags=$('cb-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  if(!template){ toast('Enter a dork template','error'); return null; }
+  return {label,risk,category,template,tags};
+}
+
+function runCustomDork(){ const d=getCustomDork(); if(d) executeDork(d,d.category); }
+function chainCustomDork(){ const d=getCustomDork(); if(d) addToChain(d,d.category); }
+function saveCustomDork(){
+  const d=getCustomDork(); if(!d) return;
+  customDorks.push(d);
+  renderCustomSaved();
+  toast('✦ Custom dork saved','success');
+}
+
+function renderCustomSaved(){
+  const list=$('custom-saved-list'); list.innerHTML='';
+  if(!customDorks.length){ list.innerHTML='<div style="color:var(--fg);opacity:.4;font-size:11px">No custom dorks saved yet</div>'; return; }
+  customDorks.forEach((d,i)=>{
+    const div=document.createElement('div');
+    div.className='chain-item';
+    div.innerHTML=`${riskBadge(d.risk)}<div class="chain-item-info"><div class="chain-item-label">${d.label}</div><div class="chain-item-query">${d.template}</div></div>
+      <button class="btn btn-primary btn-xs" onclick="executeDork(customDorks[${i}],customDorks[${i}].category)">▶</button>
+      <button class="btn btn-warn btn-xs" onclick="addToChain(customDorks[${i}],customDorks[${i}].category)">⛓</button>
+      <button class="btn btn-danger btn-xs" onclick="customDorks.splice(${i},1);renderCustomSaved()">✕</button>`;
+    list.appendChild(div);
+  });
+}
+
+function importDork(){
+  const raw=$('import-textarea').value.trim(); if(!raw) return;
+  try{
+    let d;
+    if(raw.startsWith('{')) d=JSON.parse(raw);
+    else d={label:'Imported',template:raw,risk:'medium',tags:[]};
+    customDorks.push(d);
+    renderCustomSaved();
+    $('import-textarea').value='';
+    toast('↑ Dork imported','success');
+  }catch(e){ toast('Invalid JSON: '+e.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════════
+function setExportFmt(f,el){ exportFmt=f; $$('.format-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); refreshExportPreview(); }
+
+function getExportItems(){
+  const rf=document.querySelector('[name=export-risk]:checked')?.value||'all';
+  return results.filter(r=>rf==='all'||r.risk===rf||(rf==='high'&&['critical','high'].includes(r.risk)));
+}
+
+function buildExportContent(items){
+  const q=!$('inc-queries')?.checked, urls=!$('inc-urls')?.checked, meta=!$('inc-meta')?.checked;
+  if(exportFmt==='json') return JSON.stringify(items, null, 2);
+  if(exportFmt==='csv'){
+    const hdr='Label,Risk,Category,Query,URL,Target,Time\n';
+    return hdr+items.map(r=>`"${r.label}","${r.risk}","${r.category}","${r.query}","${r.url}","${r.target}","${r.time}"`).join('\n');
+  }
+  if(exportFmt==='md'){
+    let out=`# Google Dork Report\n**Target:** \`${getTarget()}\`  \n**Generated:** ${new Date().toLocaleString()}  \n**Total:** ${items.length}\n\n---\n\n`;
+    items.forEach(r=>{ out+=`## ${r.label}\n- **Risk:** \`${r.risk.toUpperCase()}\`\n- **Category:** ${r.category}\n- **Query:** \`${r.query}\`\n- **URL:** ${r.url}\n- **Time:** ${r.time}\n\n---\n\n`; });
+    return out;
+  }
+  let out=`DORK//ENGINE REPORT\nTarget: ${getTarget()}\nGenerated: ${new Date().toLocaleString()}\nTotal: ${items.length}\n${'═'.repeat(60)}\n\n`;
+  items.forEach(r=>{ out+=`[${r.risk.toUpperCase()}] ${r.label}\nCategory: ${r.category}\nQuery: ${r.query}\nURL: ${r.url}\nTime: ${r.time}\n${'-'.repeat(60)}\n\n`; });
+  return out;
+}
+
+function refreshExportPreview(){
+  const items=getExportItems();
+  const preview=buildExportContent(items.slice(-8));
+  $('export-preview').textContent=items.length?preview:'No results yet...';
+  $('export-stats').textContent=`${items.length} results selected`;
+}
+
+function downloadFile(content, name, type='text/plain'){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+
+function doExport(){
+  const items=getExportItems();
+  if(!items.length){ toast('No results to export','error'); return; }
+  const ts2=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const name=`dork-report-${getTarget()}-${ts2}.${exportFmt}`;
+  const mimes={txt:'text/plain',csv:'text/csv',json:'application/json',md:'text/markdown'};
+  downloadFile(buildExportContent(items), name, mimes[exportFmt]);
+  toast(`↓ Exported ${items.length} results as .${exportFmt}`,'success');
+}
+
+function copyExport(){
+  const items=getExportItems();
+  if(!items.length){ toast('No results to export','error'); return; }
+  copyText(buildExportContent(items));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RADAR VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════
+function drawRadar(){
+  const canvas=$('radar-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=420, H=420, cx=W/2, cy=H/2, R=160;
+  ctx.clearRect(0,0,W,H);
+
+  const cats=Object.keys(DORK_DB);
+  const N=cats.length;
+  const angles=cats.map((_,i)=>(-Math.PI/2)+(2*Math.PI/N)*i);
+
+  const riskW={critical:4,high:3,medium:2,low:1};
+  const scores=cats.map(cat=>{
+    const catResults=results.filter(r=>r.category===cat||r.category===cat.replace(/^[^\s]+\s/,''));
+    if(!catResults.length) return 0;
+    const score=catResults.reduce((s,r)=>s+(riskW[r.risk]||1),0);
+    return Math.min(score/8,1);
+  });
+  const maxS=Math.max(...scores,.01);
+  const norm=scores.map(s=>s/maxS);
+
+  // Grid rings
+  [0.25,0.5,0.75,1].forEach(f=>{
+    ctx.beginPath();
+    angles.forEach((a,i)=>{
+      const x=cx+Math.cos(a)*R*f, y=cy+Math.sin(a)*R*f;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.closePath();
+    ctx.strokeStyle=`rgba(0,229,255,${0.06+f*0.06})`;
+    ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle=`rgba(0,229,255,${0.01+f*0.01})`;ctx.fill();
+  });
+
+  // Axes
+  angles.forEach(a=>{
+    ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);
+    ctx.strokeStyle='rgba(0,229,255,0.12)';ctx.lineWidth=1;ctx.stroke();
+  });
+
+  // Data polygon
+  ctx.beginPath();
+  angles.forEach((a,i)=>{
+    const v=norm[i]*R;
+    const x=cx+Math.cos(a)*v, y=cy+Math.sin(a)*v;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle='rgba(0,229,255,0.15)';ctx.fill();
+  ctx.strokeStyle='rgba(0,229,255,0.7)';ctx.lineWidth=2;ctx.stroke();
+
+  // Dots on data
+  angles.forEach((a,i)=>{
+    const v=norm[i]*R;
+    ctx.beginPath();
+    ctx.arc(cx+Math.cos(a)*v, cy+Math.sin(a)*v, 5, 0, Math.PI*2);
+    ctx.fillStyle='#00e5ff';ctx.fill();
+    ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();
+  });
+
+  // Labels
+  ctx.font='11px "Share Tech Mono"';
+  angles.forEach((a,i)=>{
+    const x=cx+Math.cos(a)*(R+24), y=cy+Math.sin(a)*(R+24);
+    ctx.fillStyle='rgba(200,218,232,0.7)';
+    ctx.textAlign=Math.cos(a)<-0.1?'right':Math.cos(a)>0.1?'left':'center';
+    ctx.textBaseline=Math.sin(a)<-0.1?'bottom':Math.sin(a)>0.1?'top':'middle';
+    const shortName=cats[i].replace(/^[^\s]+\s/,'').slice(0,12);
+    ctx.fillText(shortName,x,y);
+    const cnt=results.filter(r=>r.category===cats[i]).length;
+    if(cnt){ ctx.fillStyle='rgba(0,229,255,0.6)'; ctx.font='9px "Share Tech Mono"'; ctx.fillText('('+cnt+')',x,y+12); ctx.font='11px "Share Tech Mono"'; }
+  });
+
+  // Center
+  ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);
+  ctx.fillStyle='var(--accent)';ctx.fill();
+}
+
+function updateVizStats(){
+  const el=$('viz-stats'); el.innerHTML='';
+  const total=results.length;
+  const byRisk={critical:0,high:0,medium:0,low:0};
+  results.forEach(r=>{ if(byRisk[r.risk]!==undefined) byRisk[r.risk]++; });
+  const items=[
+    {label:'Total Queries',val:total,color:'var(--accent)'},
+    {label:'Critical',val:byRisk.critical,color:'var(--accent3)'},
+    {label:'High',val:byRisk.high,color:'var(--accent4)'},
+    {label:'Medium',val:byRisk.medium,color:'var(--accent)'},
+    {label:'Low',val:byRisk.low,color:'var(--accent2)'},
+  ];
+  items.forEach(item=>{
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)';
+    div.innerHTML=`<span style="color:var(--fg)">${item.label}</span><span style="color:${item.color};font-family:var(--font-display);font-weight:700">${item.val}</span>`;
+    el.appendChild(div);
+  });
+
+  const catEl=$('viz-cats'); catEl.innerHTML='';
+  Object.entries(DORK_DB).forEach(([cat,data])=>{
+    const cnt=results.filter(r=>r.category===cat).length;
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0';
+    const pct=cnt?Math.round(cnt/Math.max(results.length,1)*100):0;
+    div.innerHTML=`<span style="color:${data.color};font-size:13px">${cat.split(' ')[0]}</span>
+      <span style="color:var(--fg);flex:1">${cat.replace(/^[^\s]+\s/,'')}</span>
+      <span style="color:${data.color};font-family:var(--font-display)">${cnt}</span>
+      <div style="width:50px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${data.color};border-radius:2px"></div>
+      </div>`;
+    catEl.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════════════════════
+function toggleTheme(){
+  darkTheme=!darkTheme;
+  if(!darkTheme){
+    document.documentElement.style.setProperty('--bg','#f0f4f8');
+    document.documentElement.style.setProperty('--bg2','#e2e8f0');
+    document.documentElement.style.setProperty('--bg3','#cbd5e1');
+    document.documentElement.style.setProperty('--bg4','#b0bec5');
+    document.documentElement.style.setProperty('--fg','#475569');
+    document.documentElement.style.setProperty('--fg2','#1e293b');
+    document.documentElement.style.setProperty('--fg3','#0f172a');
+    document.documentElement.style.setProperty('--border','#94a3b8');
+    document.documentElement.style.setProperty('--border2','#64748b');
+  } else {
+    document.documentElement.style.setProperty('--bg','#050709');
+    document.documentElement.style.setProperty('--bg2','#080c10');
+    document.documentElement.style.setProperty('--bg3','#0d1520');
+    document.documentElement.style.setProperty('--bg4','#111a26');
+    document.documentElement.style.setProperty('--fg','#8ba4bf');
+    document.documentElement.style.setProperty('--fg2','#c8dae8');
+    document.documentElement.style.setProperty('--fg3','#e8f4ff');
+    document.documentElement.style.setProperty('--border','#1a2535');
+    document.documentElement.style.setProperty('--border2','#243044');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════════
+function tick(){ $('status-time').textContent=new Date().toLocaleTimeString(); }
+setInterval(tick,1000); tick();
+
+// ═══════════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e=>{
+  if(e.ctrlKey||e.metaKey){
+    if(e.key==='Enter'){ e.preventDefault(); runAllCurrent(); }
+    if(e.key==='k'){ e.preventDefault(); $('target-input').focus(); }
+    if(e.key==='f'){ e.preventDefault(); switchTab('search',$$('.tab-btn')[1]); $('search-input').focus(); }
+    if(e.key==='e'){ e.preventDefault(); switchTab('export',$$('.tab-btn')[6]); }
+  }
+  if(e.key==='Escape') closeModal();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// TARGET INPUT LIVE UPDATE
+// ═══════════════════════════════════════════════════════════════════
+$('target-input').addEventListener('input', ()=>{
+  if(currentCategory) selectCategory(currentCategory, document.querySelector('.cat-item.active'));
+});
+$('target-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') runAllCurrent();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+buildCatList();
+buildAllDorks();
+buildOpsList();
+doSearch();
+renderCustomSaved();
+updateStats();
+updateBuilderPreview();
+refreshExportPreview();
+
+// Auto-select first category
+const firstCat=document.querySelector('.cat-item');
+if(firstCat){ firstCat.click(); }
+
+// Boot toast
+setTimeout(()=>toast('⬡ DORK//ENGINE ready — Set target and begin recon','info',4000),800);
+setTimeout(()=>toast('💡 Tip: Ctrl+K to focus target, Ctrl+F to search, Ctrl+Enter to run all','info',6000),2200);
+</script>
+</body>
+</html>
