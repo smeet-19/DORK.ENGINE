@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DORK//ENGINE — Interactive User Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#03050a;--bg2:#07090f;--bg3:#0b0f1a;--bg4:#0f1520;--bg5:#141c28;
+  --border:#1a2535;--border2:#22304a;--border3:#2a3d5a;
+  --fg:#7a96b5;--fg2:#a8c4d8;--fg3:#d0e8f5;--fg4:#eef7ff;
+  --accent:#00e5ff;--a2:#00ff9d;--a3:#ff3c6e;--a4:#ffd600;--a5:#bf5af2;--a6:#ff8c42;
+  --font-mono:'Share Tech Mono',monospace;
+  --font-title:'Orbitron',monospace;
+  --font-ui:'Rajdhani',sans-serif;
+  --glow-c:rgba(0,229,255,.18);
+  --radius:10px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg2);font-family:var(--font-ui);overflow-x:hidden;min-height:100vh;}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px;opacity:.4}
+::selection{background:rgba(0,229,255,.2);color:#fff}
+
+/* ── CANVAS ── */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5}
+
+/* ── SCANLINE ── */
+.scanline{position:fixed;top:0;left:0;right:0;height:2px;z-index:9999;pointer-events:none;
+  background:linear-gradient(transparent,rgba(0,229,255,.3),transparent);
+  animation:scan 8s linear infinite;}
+@keyframes scan{0%{top:-4px}100%{top:100vh}}
+
+/* ── LAYOUT ── */
+#app{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+
+/* ── HERO ── */
+#hero{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:40px 24px;position:relative;
+  background:radial-gradient(ellipse 70% 60% at 50% 40%,rgba(0,229,255,.05),transparent);
+}
+.hero-badge{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:4px;color:var(--accent);
+  background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);
+  padding:6px 16px;border-radius:20px;margin-bottom:24px;
+  animation:fade-up .8s ease both;
+}
+.hero-title{
+  font-family:var(--font-title);font-size:clamp(36px,8vw,80px);font-weight:900;
+  letter-spacing:6px;text-align:center;line-height:1.1;
+  background:linear-gradient(135deg,var(--accent),var(--a2),var(--accent));
+  background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shimmer 4s linear infinite,fade-up .9s ease both;
+  margin-bottom:8px;
+}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+.hero-sub{
+  font-family:var(--font-title);font-size:clamp(12px,2vw,18px);font-weight:400;
+  letter-spacing:8px;color:var(--fg);text-align:center;margin-bottom:20px;
+  animation:fade-up 1s ease both;
+}
+.hero-desc{
+  font-size:16px;color:var(--fg2);text-align:center;max-width:600px;
+  line-height:1.8;margin-bottom:40px;
+  animation:fade-up 1.1s ease both;
+}
+.hero-scroll{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-size:11px;letter-spacing:3px;color:var(--fg);
+  animation:fade-up 1.3s ease both;cursor:pointer;
+  transition:color .2s;
+}
+.hero-scroll:hover{color:var(--accent)}
+.scroll-arrow{animation:bounce 2s ease-in-out infinite;font-size:20px}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(8px)}}
+@keyframes fade-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+.sections-count{
+  display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:40px;
+  animation:fade-up 1.2s ease both;
+}
+.s-chip{
+  font-family:var(--font-mono);font-size:11px;padding:6px 14px;border-radius:20px;
+  border:1px solid var(--border2);background:var(--bg3);color:var(--fg);
+  cursor:pointer;transition:all .2s;
+}
+.s-chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,.06)}
+
+/* ── NAV ── */
+#nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(3,5,10,.9);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:12px 24px;
+  display:flex;align-items:center;gap:16px;
+  transform:translateY(-100%);transition:transform .3s ease;
+}
+#nav.visible{transform:translateY(0)}
+.nav-logo{font-family:var(--font-title);font-size:14px;color:var(--accent);letter-spacing:3px;white-space:nowrap}
+.nav-links{display:flex;gap:4px;flex:1;overflow-x:auto;padding:2px 0}
+.nav-link{
+  font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;
+  padding:5px 10px;border-radius:4px;cursor:pointer;white-space:nowrap;
+  color:var(--fg);transition:all .2s;border:1px solid transparent;
+}
+.nav-link:hover{color:var(--accent);border-color:rgba(0,229,255,.2)}
+.nav-link.active{color:var(--accent);background:rgba(0,229,255,.08);border-color:rgba(0,229,255,.2)}
+.nav-progress{height:2px;background:var(--border);position:absolute;bottom:0;left:0;right:0}
+.nav-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--a2));width:0%;transition:width .1s}
+
+/* ── SECTION ── */
+.section{
+  min-height:100vh;padding:80px 24px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;position:relative;
+  border-bottom:1px solid var(--border);
+}
+.section-inner{max-width:1100px;width:100%;margin:0 auto}
+
+/* ── SECTION HEADER ── */
+.section-header{
+  display:flex;align-items:center;gap:20px;margin-bottom:48px;
+}
+.section-num{
+  font-family:var(--font-title);font-size:60px;font-weight:900;
+  opacity:.06;line-height:1;color:var(--accent);position:absolute;
+  left:-10px;top:-10px;pointer-events:none;
+}
+.section-icon-wrap{
+  width:64px;height:64px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:28px;flex-shrink:0;position:relative;
+}
+.section-icon-wrap::after{
+  content:'';position:absolute;inset:-1px;border-radius:13px;
+  background:linear-gradient(135deg,currentColor,transparent);
+  opacity:.2;pointer-events:none;
+}
+.section-title-group{flex:1}
+.section-label{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:4px;
+  margin-bottom:6px;opacity:.7;
+}
+.section-title{
+  font-family:var(--font-title);font-size:clamp(22px,4vw,36px);font-weight:900;
+  letter-spacing:2px;line-height:1.2;color:var(--fg4);
+}
+.section-badge{
+  font-family:var(--font-mono);font-size:9px;padding:3px 10px;border-radius:12px;
+  margin-left:12px;vertical-align:middle;
+}
+
+/* ── CONTENT CARDS ── */
+.content-grid{display:grid;gap:20px}
+.content-grid-2{grid-template-columns:1fr 1fr}
+.content-grid-3{grid-template-columns:1fr 1fr 1fr}
+
+.card{
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;position:relative;overflow:hidden;
+  transition:border-color .3s,transform .2s;
+}
+.card:hover{border-color:var(--border3);transform:translateY(-2px)}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--a2));opacity:0;
+  transition:opacity .3s;
+}
+.card:hover::before{opacity:1}
+.card-icon{font-size:28px;margin-bottom:12px}
+.card-title{
+  font-family:var(--font-title);font-size:13px;font-weight:700;
+  letter-spacing:2px;color:var(--fg3);margin-bottom:8px;
+}
+.card-text{font-size:13px;line-height:1.7;color:var(--fg)}
+.card-tip{
+  margin-top:12px;padding:10px 12px;border-radius:6px;
+  background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.12);
+  font-size:12px;color:var(--accent);font-family:var(--font-mono);
+}
+.card-tip::before{content:'💡 '}
+
+/* ── STEP FLOW ── */
+.step-flow{display:flex;flex-direction:column;gap:0}
+.step{
+  display:flex;gap:20px;align-items:flex-start;padding:20px 0;
+  border-bottom:1px solid var(--border);position:relative;
+}
+.step:last-child{border-bottom:none}
+.step-left{display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0}
+.step-num{
+  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:var(--font-title);font-size:13px;font-weight:700;
+  flex-shrink:0;position:relative;z-index:1;
+}
+.step-line{width:2px;flex:1;min-height:20px;margin-top:4px;background:var(--border)}
+.step:last-child .step-line{display:none}
+.step-content{flex:1;padding-top:8px}
+.step-title{
+  font-family:var(--font-title);font-size:13px;font-weight:700;
+  letter-spacing:1px;color:var(--fg3);margin-bottom:6px;
+}
+.step-desc{font-size:13px;line-height:1.7;color:var(--fg);margin-bottom:8px}
+.step-code{
+  background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  padding:10px 14px;font-family:var(--font-mono);font-size:11px;
+  color:var(--accent);letter-spacing:.5px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-all;margin-top:8px;
+}
+.step-img{
+  background:var(--bg4);border:1px solid var(--border);border-radius:8px;
+  padding:14px;margin-top:10px;overflow:hidden;
+}
+
+/* ── MOCK UI ── */
+.mock-ui{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
+  overflow:hidden;position:relative;
+}
+.mock-titlebar{
+  background:var(--bg4);border-bottom:1px solid var(--border);
+  padding:10px 14px;display:flex;align-items:center;gap:8px;
+}
+.mock-dot{width:10px;height:10px;border-radius:50%}
+.mock-title{font-family:var(--font-mono);font-size:10px;color:var(--fg);letter-spacing:2px;margin-left:8px}
+.mock-body{padding:16px}
+.mock-input-row{display:flex;gap:8px;margin-bottom:12px}
+.mock-input{
+  flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;
+  padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--accent2);
+  outline:none;
+}
+.mock-btn{
+  background:var(--accent);color:#000;border:none;border-radius:5px;
+  padding:8px 14px;font-family:var(--font-title);font-size:9px;
+  font-weight:700;letter-spacing:1px;cursor:pointer;white-space:nowrap;
+}
+.mock-btn-ghost{background:var(--bg3);color:var(--fg);border:1px solid var(--border2)}
+.mock-row{
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px 12px;margin-bottom:6px;
+  display:flex;align-items:center;gap:8px;font-size:11px;
+}
+.mock-risk{
+  font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 6px;
+  border-radius:2px;white-space:nowrap;
+}
+.mock-risk.cr{background:rgba(255,60,110,.15);color:#ff3c6e;border:1px solid rgba(255,60,110,.3)}
+.mock-risk.hi{background:rgba(255,214,0,.12);color:#ffd600;border:1px solid rgba(255,214,0,.25)}
+.mock-risk.md{background:rgba(0,229,255,.1);color:#00e5ff;border:1px solid rgba(0,229,255,.2)}
+.mock-risk.lo{background:rgba(0,255,157,.08);color:#00ff9d;border:1px solid rgba(0,255,157,.2)}
+.mock-label{color:var(--fg2);font-weight:600}
+.mock-query{color:var(--fg);font-size:10px;font-family:var(--font-mono);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mock-sidebar{width:180px;background:var(--bg3);border-right:1px solid var(--border);padding:8px}
+.mock-cat{padding:7px 10px;border-radius:4px;font-size:11px;color:var(--fg);cursor:pointer;border-left:3px solid transparent;margin-bottom:2px}
+.mock-cat.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,229,255,.07)}
+.mock-layout{display:flex;gap:0;height:180px;overflow:hidden}
+.mock-content{flex:1;padding:10px;overflow-y:auto}
+.mock-tag{font-size:9px;background:var(--bg4);color:var(--fg);padding:1px 5px;border-radius:2px}
+
+/* ── FEATURE PILLS ── */
+.feature-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pill{
+  font-family:var(--font-mono);font-size:10px;padding:5px 12px;border-radius:20px;
+  border:1px solid var(--border2);background:var(--bg3);color:var(--fg2);
+  display:flex;align-items:center;gap:6px;
+}
+.pill-dot{width:6px;height:6px;border-radius:50%}
+
+/* ── KB SHORTCUT ── */
+.kb-grid{display:flex;flex-wrap:wrap;gap:8px}
+.kb-item{
+  display:flex;align-items:center;gap:10px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px 14px;min-width:200px;
+}
+.kb-key{
+  font-family:var(--font-mono);font-size:10px;background:var(--bg4);
+  border:1px solid var(--border3);border-radius:4px;padding:3px 8px;
+  color:var(--accent);white-space:nowrap;box-shadow:0 2px 0 var(--border3);
+}
+.kb-desc{font-size:12px;color:var(--fg2)}
+
+/* ── WORKFLOW ── */
+.workflow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;margin:32px 0}
+.wf-step{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:20px 16px;min-width:130px;text-align:center;
+  transition:all .2s;cursor:default;
+}
+.wf-step:hover{border-color:var(--border3);background:var(--bg4)}
+.wf-icon{font-size:28px}
+.wf-label{font-size:11px;color:var(--fg2);font-weight:600;font-family:var(--font-ui)}
+.wf-desc{font-size:10px;color:var(--fg);line-height:1.4}
+.wf-arrow{font-size:20px;color:var(--accent);opacity:.4;padding:0 4px}
+
+/* ── HIGHLIGHT BOX ── */
+.highlight-box{
+  background:linear-gradient(135deg,rgba(0,229,255,.06),rgba(0,255,157,.04));
+  border:1px solid rgba(0,229,255,.2);border-radius:var(--radius);
+  padding:20px 24px;margin:16px 0;
+}
+.highlight-box-title{
+  font-family:var(--font-title);font-size:11px;letter-spacing:2px;
+  color:var(--accent);margin-bottom:8px;
+}
+.warning-box{
+  background:rgba(255,60,110,.06);border:1px solid rgba(255,60,110,.2);
+  border-radius:var(--radius);padding:16px 20px;margin:12px 0;
+}
+.warning-box-title{font-family:var(--font-title);font-size:10px;letter-spacing:2px;color:var(--a3);margin-bottom:6px}
+
+/* ── TABLE ── */
+.info-table{width:100%;border-collapse:collapse;font-size:12px}
+.info-table th{
+  background:var(--bg3);padding:10px 14px;text-align:left;
+  font-family:var(--font-title);font-size:9px;letter-spacing:2px;color:var(--accent);
+  border-bottom:1px solid var(--border);
+}
+.info-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--fg2)}
+.info-table tr:hover td{background:rgba(0,229,255,.03)}
+.info-table td:first-child{font-family:var(--font-mono);color:var(--a2)}
+
+/* ── RADAR MINI ── */
+.radar-wrap{display:flex;justify-content:center;padding:20px}
+
+/* ── ANIM ── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:.1s}
+.reveal-delay-2{transition-delay:.2s}
+.reveal-delay-3{transition-delay:.3s}
+.reveal-delay-4{transition-delay:.4s}
+.reveal-delay-5{transition-delay:.5s}
+
+/* ── SECTION COLORS ── */
+.c-cyan{color:var(--accent)}.c-green{color:var(--a2)}.c-red{color:var(--a3)}.c-yellow{color:var(--a4)}.c-purple{color:var(--a5)}.c-orange{color:var(--a6)}
+.bg-cyan{background:rgba(0,229,255,.08);border-color:rgba(0,229,255,.2)}
+.bg-green{background:rgba(0,255,157,.06);border-color:rgba(0,255,157,.2)}
+.bg-red{background:rgba(255,60,110,.07);border-color:rgba(255,60,110,.2)}
+.bg-yellow{background:rgba(255,214,0,.07);border-color:rgba(255,214,0,.2)}
+.bg-purple{background:rgba(191,90,242,.07);border-color:rgba(191,90,242,.2)}
+.bg-orange{background:rgba(255,140,66,.07);border-color:rgba(255,140,66,.2)}
+
+/* ── ICON WRAP COLORS ── */
+.iw-cyan{background:rgba(0,229,255,.1);color:var(--accent)}
+.iw-green{background:rgba(0,255,157,.1);color:var(--a2)}
+.iw-red{background:rgba(255,60,110,.1);color:var(--a3)}
+.iw-yellow{background:rgba(255,214,0,.1);color:var(--a4)}
+.iw-purple{background:rgba(191,90,242,.1);color:var(--a5)}
+.iw-orange{background:rgba(255,140,66,.1);color:var(--a6)}
+
+/* ── FOOTER ── */
+#footer{
+  padding:40px 24px;text-align:center;border-top:1px solid var(--border);
+  background:var(--bg2);
+}
+.footer-title{font-family:var(--font-title);font-size:18px;color:var(--accent);letter-spacing:3px;margin-bottom:8px}
+.footer-text{font-size:13px;color:var(--fg);line-height:1.7;max-width:500px;margin:0 auto 16px}
+.warning-strip{
+  background:rgba(255,60,110,.08);border:1px solid rgba(255,60,110,.2);
+  border-radius:6px;padding:12px 20px;font-family:var(--font-mono);
+  font-size:10px;letter-spacing:2px;color:var(--a3);display:inline-block;margin-top:12px;
+}
+
+/* ── BACK TO TOP ── */
+#back-top{
+  position:fixed;bottom:24px;right:24px;z-index:50;
+  background:var(--accent);color:#000;border:none;border-radius:50%;
+  width:44px;height:44px;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(0,229,255,.3);
+  opacity:0;pointer-events:none;transition:all .3s;
+}
+#back-top.visible{opacity:1;pointer-events:all}
+#back-top:hover{transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,229,255,.5)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .content-grid-2,.content-grid-3{grid-template-columns:1fr}
+  .workflow{flex-direction:column}.wf-arrow{transform:rotate(90deg)}
+  .section-header{flex-direction:column;align-items:flex-start}
+  .kb-grid{flex-direction:column}
+  .mock-layout{flex-direction:column;height:auto}
+  .mock-sidebar{width:100%;border-right:none;border-bottom:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="scanline"></div>
+
+<!-- STICKY NAV -->
+<nav id="nav">
+  <div class="nav-logo">DORK//ENGINE</div>
+  <div class="nav-links" id="nav-links"></div>
+  <div class="nav-progress"><div class="nav-progress-fill" id="nav-progress"></div></div>
+</nav>
+
+<div id="app">
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- HERO -->
+<!-- ══════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-badge">INTERACTIVE USER GUIDE</div>
+  <div class="hero-title">DORK//ENGINE</div>
+  <div class="hero-sub">ADVANCED OSINT RECON FRAMEWORK</div>
+  <div class="hero-desc">
+    A complete walkthrough of every section in the tool — learn how to use each feature, understand every button, and master Google dorking for authorized security research.
+  </div>
+  <div class="sections-count" id="section-chips"></div>
+  <div class="hero-scroll" onclick="document.getElementById('s-overview').scrollIntoView({behavior:'smooth'})">
+    <span>SCROLL TO BEGIN</span>
+    <div class="scroll-arrow">⬇</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 0. OVERVIEW -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-overview" data-title="OVERVIEW">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-cyan">⬡</div>
+      <div class="section-title-group">
+        <div class="section-label c-cyan">SECTION 00</div>
+        <div class="section-title">TOOL OVERVIEW</div>
+      </div>
+    </div>
+
+    <div class="workflow reveal">
+      <div class="wf-step"><div class="wf-icon">🎯</div><div class="wf-label">Set Target</div><div class="wf-desc">Enter domain</div></div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-step"><div class="wf-icon">📂</div><div class="wf-label">Pick Category</div><div class="wf-desc">7 threat categories</div></div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-step"><div class="wf-icon">▶</div><div class="wf-label">Run Dorks</div><div class="wf-desc">Generate queries</div></div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-step"><div class="wf-icon">🔍</div><div class="wf-label">Search Google</div><div class="wf-desc">Open in browser</div></div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-step"><div class="wf-icon">📊</div><div class="wf-label">Analyze</div><div class="wf-desc">Radar + export</div></div>
+    </div>
+
+    <div class="content-grid content-grid-3 reveal">
+      <div class="card bg-cyan">
+        <div class="card-icon">⬡</div>
+        <div class="card-title">WHAT IS IT?</div>
+        <div class="card-text">DORK//ENGINE is an advanced Google dorking assistant for OSINT (Open Source Intelligence) and authorized security research. It generates pre-built search queries that find sensitive exposed data on target domains.</div>
+      </div>
+      <div class="card bg-green">
+        <div class="card-icon">🛡️</div>
+        <div class="card-title">WHO IS IT FOR?</div>
+        <div class="card-text">Security researchers, penetration testers, bug bounty hunters, and OSINT analysts who need to enumerate publicly exposed information on domains they are <strong>authorized</strong> to test.</div>
+      </div>
+      <div class="card bg-red">
+        <div class="card-icon">⚠️</div>
+        <div class="card-title">IMPORTANT</div>
+        <div class="card-text">This tool generates Google search queries only. It does not perform any hacking. Always ensure you have explicit written permission before conducting reconnaissance on any target domain.</div>
+      </div>
+    </div>
+
+    <div class="highlight-box reveal reveal-delay-2">
+      <div class="highlight-box-title">🗂️ 8 TABS — QUICK REFERENCE</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px;font-size:12px">
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">⬡ <strong style="color:var(--fg3)">GENERATOR</strong> — Browse and run dorks by category</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">⌕ <strong style="color:var(--fg3)">SEARCH</strong> — Full-text search across all 70+ dorks</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">⛓ <strong style="color:var(--fg3)">CHAIN</strong> — Queue and batch-execute dork sequences</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">✦ <strong style="color:var(--fg3)">AI GENERATE</strong> — Claude AI creates custom dorks</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">⌗ <strong style="color:var(--fg3)">OPERATORS</strong> — Google search operator reference</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">✏ <strong style="color:var(--fg3)">BUILDER</strong> — Create and save custom dork templates</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">↓ <strong style="color:var(--fg3)">EXPORT</strong> — Download results as TXT/CSV/JSON/MD</div>
+        <div style="padding:8px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">◎ <strong style="color:var(--fg3)">RADAR</strong> — Visual threat distribution chart</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 1. HEADER & TARGET BAR -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-header" data-title="HEADER">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-cyan">🎯</div>
+      <div class="section-title-group">
+        <div class="section-label c-cyan">SECTION 01</div>
+        <div class="section-title">HEADER & TARGET BAR</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div>
+        <div class="mock-ui">
+          <div class="mock-titlebar">
+            <div class="mock-dot" style="background:#ff5f57"></div>
+            <div class="mock-dot" style="background:#febc2e"></div>
+            <div class="mock-dot" style="background:#28c840"></div>
+            <div class="mock-title">DORK//ENGINE v4.0</div>
+          </div>
+          <div class="mock-body">
+            <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+              <div style="font-family:var(--font-title);font-size:12px;color:var(--accent);letter-spacing:2px">DORK//ENGINE</div>
+              <div style="margin-left:auto;display:flex;gap:6px">
+                <div style="background:var(--bg4);border:1px solid var(--border2);padding:4px 8px;border-radius:4px;font-size:9px;text-align:center">
+                  <div style="font-family:var(--font-title);color:var(--accent);font-size:14px">12</div>
+                  <div style="font-size:8px;color:var(--fg)">RESULTS</div>
+                </div>
+                <div style="background:var(--bg4);border:1px solid var(--border2);padding:4px 8px;border-radius:4px;font-size:9px;text-align:center">
+                  <div style="font-family:var(--font-title);color:var(--a3);font-size:14px">3</div>
+                  <div style="font-size:8px;color:var(--fg)">CRITICAL</div>
+                </div>
+              </div>
+            </div>
+            <div class="mock-input-row">
+              <div class="mock-input">⬡ example.com</div>
+              <div class="mock-btn">▶ RUN ALL</div>
+              <div class="mock-btn mock-btn-ghost">✕ CLEAR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-flow">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.15);color:var(--accent);border:1px solid rgba(0,229,255,.3)">01</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">STAT CHIPS (Top Right)</div>
+            <div class="step-desc">Four live counters update in real-time: <strong style="color:var(--accent)">RESULTS</strong> (total queries generated), <strong style="color:var(--a3)">CRITICAL</strong> (high-threat findings), <strong style="color:var(--a4)">CHAIN</strong> (queued dorks), <strong style="color:var(--a5)">SAVED</strong> (bookmarked results).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.15);color:var(--a2);border:1px solid rgba(0,255,157,.3)">02</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">TARGET INPUT</div>
+            <div class="step-desc">Type your target domain here (e.g. <code style="color:var(--accent2);background:var(--bg3);padding:2px 6px;border-radius:3px">example.com</code>). All dork templates use <code style="color:var(--accent2);background:var(--bg3);padding:2px 6px;border-radius:3px">{"{target}"}</code> as a placeholder — it gets replaced with whatever you type.</div>
+            <div class="card-tip">Press Enter or click ▶ RUN ALL to execute all dorks in the current category</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(255,214,0,.12);color:var(--a4);border:1px solid rgba(255,214,0,.25)">03</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">ACTION BUTTONS</div>
+            <div class="step-desc"><strong style="color:var(--accent)">▶ RUN ALL</strong> — runs every dork in the selected category. <strong style="color:var(--a4)">⛓ CHAIN</strong> — execute the chain queue. <strong style="color:var(--fg3)">✕ CLEAR</strong> — wipe all results. <strong style="color:var(--fg3)">♥ SAVED</strong> — view saved dorks. <strong style="color:var(--fg3)">◑ THEME</strong> — toggle dark/light mode.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 2. GENERATOR TAB -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-generator" data-title="GENERATOR">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-green">⬡</div>
+      <div class="section-title-group">
+        <div class="section-label c-green">SECTION 02</div>
+        <div class="section-title">⬡ GENERATOR TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal" style="margin-bottom:24px">
+      <div>
+        <div class="mock-ui">
+          <div class="mock-body" style="padding:10px">
+            <div class="mock-layout">
+              <div class="mock-sidebar">
+                <div style="font-size:9px;color:var(--fg);letter-spacing:2px;padding:4px 6px;margin-bottom:4px">CATEGORIES</div>
+                <div class="mock-cat active">📁 File Exposure <span style="float:right;font-size:9px">12</span></div>
+                <div class="mock-cat">🔐 Auth & Admin</div>
+                <div class="mock-cat">🗝️ Secrets & Creds</div>
+                <div class="mock-cat">📂 Open Directories</div>
+                <div class="mock-cat">⚙️ Tech Fingerprint</div>
+                <div class="mock-cat">☁️ Cloud & Infra</div>
+              </div>
+              <div class="mock-content">
+                <div class="mock-row"><span class="mock-risk md">MEDIUM</span><span class="mock-label">PDF Documents</span></div>
+                <div class="mock-row"><span class="mock-risk hi">HIGH</span><span class="mock-label">Excel Sheets</span></div>
+                <div class="mock-row"><span class="mock-risk cr">CRITICAL</span><span class="mock-label">Config Files</span></div>
+                <div class="mock-row"><span class="mock-risk cr">CRITICAL</span><span class="mock-label">SQL Dumps</span></div>
+                <div class="mock-row"><span class="mock-risk hi">HIGH</span><span class="mock-label">Log Files</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="step-flow">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.15);color:var(--a2);border:1px solid rgba(0,255,157,.3)">1</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">LEFT SIDEBAR — CATEGORIES</div>
+              <div class="step-desc">7 threat categories organized by type. Click any category to load its dorks in the middle pane. The colored threat label (CRITICAL/HIGH/MEDIUM) shows the overall danger level.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.15);color:var(--a2);border:1px solid rgba(0,255,157,.3)">2</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">MIDDLE PANE — DORK LIST</div>
+              <div class="step-desc"><strong>Click any dork row</strong> to run it immediately. Hover to reveal the <strong style="color:var(--accent)">▶</strong> (run) and <strong style="color:var(--a4)">⛓</strong> (add to chain) buttons. Each dork shows its risk badge, name, and a preview of the resolved query.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.15);color:var(--a2);border:1px solid rgba(0,255,157,.3)">3</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">RIGHT PANE — RESULTS</div>
+              <div class="step-desc">Generated queries appear here. Each result card shows the query, risk level, and 5 action buttons: <strong>↗ OPEN</strong> (Google), <strong>⎘ QUERY</strong>, <strong>⎘ URL</strong>, <strong>♥ SAVE</strong>, <strong>⛓ CHAIN</strong>. Click ⋯ MORE for full detail modal.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-3 reveal reveal-delay-2">
+      <div class="card bg-green">
+        <div class="card-title">RISK BADGES</div>
+        <div class="step-flow" style="gap:6px">
+          <div style="display:flex;gap:8px;align-items:center;padding:4px 0"><span class="mock-risk cr">CRITICAL</span><span style="font-size:12px;color:var(--fg)">Direct credential/data exposure</span></div>
+          <div style="display:flex;gap:8px;align-items:center;padding:4px 0"><span class="mock-risk hi">HIGH</span><span style="font-size:12px;color:var(--fg)">Significant attack surface</span></div>
+          <div style="display:flex;gap:8px;align-items:center;padding:4px 0"><span class="mock-risk md">MEDIUM</span><span style="font-size:12px;color:var(--fg)">Tech fingerprint/info leak</span></div>
+          <div style="display:flex;gap:8px;align-items:center;padding:4px 0"><span class="mock-risk lo">LOW</span><span style="font-size:12px;color:var(--fg)">Public info / recon data</span></div>
+        </div>
+      </div>
+      <div class="card bg-cyan">
+        <div class="card-title">RESULT FILTERS</div>
+        <div class="card-text">Use the filter chips above the results pane to show only specific risk levels. Click <strong>ALL</strong> to see everything, or click <strong>CRITICAL</strong> to focus on the most dangerous findings first.</div>
+        <div class="card-tip">Start with CRITICAL filter after a full category run</div>
+      </div>
+      <div class="card bg-yellow">
+        <div class="card-title">7 CATEGORIES</div>
+        <div style="font-size:12px;color:var(--fg);line-height:2">
+          📁 File Exposure (12 dorks)<br>
+          🔐 Auth &amp; Admin (10 dorks)<br>
+          🗝️ Secrets &amp; Creds (10 dorks)<br>
+          📂 Open Directories (8 dorks)<br>
+          ⚙️ Tech Fingerprint (10 dorks)<br>
+          ☁️ Cloud &amp; Infra (9 dorks)<br>
+          🕵️ Social &amp; OSINT (8 dorks)
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 3. SEARCH TAB -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-search" data-title="SEARCH">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-cyan">⌕</div>
+      <div class="section-title-group">
+        <div class="section-label c-cyan">SECTION 03</div>
+        <div class="section-title">⌕ SEARCH TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div class="step-flow">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.15);color:var(--accent);border:1px solid rgba(0,229,255,.3)">1</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">SEARCH BAR</div>
+            <div class="step-desc">Type any keyword to instantly filter across all 70+ dorks. You can search by dork name, template content, risk level, tags, or category name. Results update live as you type.</div>
+            <div class="step-code">Examples:
+"sql"     → finds all SQL-related dorks
+"critical"→ shows only critical risk dorks
+"api"     → API key exposure dorks
+"cloud"   → all cloud infra dorks</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.15);color:var(--accent);border:1px solid rgba(0,229,255,.3)">2</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">RISK FILTER + SORT</div>
+            <div class="step-desc">Use the risk filter chips to narrow results to a specific severity. The sort dropdown lets you order by: <strong>Default</strong> (natural order), <strong>Risk ↑</strong> (critical first), <strong>Risk ↓</strong> (low first), or <strong>Name A-Z</strong>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.15);color:var(--accent);border:1px solid rgba(0,229,255,.3)">3</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">TABLE ACTIONS</div>
+            <div class="step-desc">Each row has 3 buttons: <strong style="color:var(--accent)">▶</strong> runs the dork and adds it to results, <strong style="color:var(--a4)">⛓</strong> adds it to the chain queue, <strong style="color:var(--fg3)">⎘</strong> copies the resolved query. Double-click any row to run it.</div>
+            <div class="card-tip">▶ RUN ALL MATCHES runs every filtered result at once</div>
+          </div>
+        </div>
+      </div>
+      <div class="mock-ui">
+        <div class="mock-body">
+          <div class="mock-input-row">
+            <div class="mock-input">🔍 aws</div>
+            <div class="mock-btn">▶ RUN ALL</div>
+            <div class="mock-btn mock-btn-ghost">⛓ CHAIN</div>
+          </div>
+          <div style="font-size:9px;color:var(--a2);margin-bottom:8px;font-family:var(--font-mono)">3 dork(s) found for "aws"</div>
+          <table style="width:100%;border-collapse:collapse;font-size:10px">
+            <thead>
+              <tr style="background:var(--bg3)">
+                <th style="padding:6px 8px;text-align:left;color:var(--accent);font-family:var(--font-title);font-size:8px;letter-spacing:1px;border-bottom:1px solid var(--border)">RISK</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--accent);font-family:var(--font-title);font-size:8px;letter-spacing:1px;border-bottom:1px solid var(--border)">LABEL</th>
+                <th style="padding:6px 8px;text-align:left;color:var(--accent);font-family:var(--font-title);font-size:8px;letter-spacing:1px;border-bottom:1px solid var(--border)">TEMPLATE</th>
+                <th style="padding:6px 8px;border-bottom:1px solid var(--border)"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:6px 8px"><span class="mock-risk cr">CRITICAL</span></td>
+                <td style="padding:6px 8px;color:var(--fg2);font-weight:600">AWS Credentials</td>
+                <td style="padding:6px 8px;color:var(--fg);font-family:var(--font-mono);font-size:9px">site:{target} intext:"AKIA"</td>
+                <td style="padding:6px 8px"><div class="mock-btn" style="padding:3px 7px;font-size:8px">▶</div></td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:6px 8px"><span class="mock-risk hi">HIGH</span></td>
+                <td style="padding:6px 8px;color:var(--fg2);font-weight:600">S3 Buckets</td>
+                <td style="padding:6px 8px;color:var(--fg);font-family:var(--font-mono);font-size:9px">site:s3.amazonaws.com "{target}"</td>
+                <td style="padding:6px 8px"><div class="mock-btn" style="padding:3px 7px;font-size:8px">▶</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 4. CHAIN BUILDER -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-chain" data-title="CHAIN">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-yellow">⛓</div>
+      <div class="section-title-group">
+        <div class="section-label c-yellow">SECTION 04</div>
+        <div class="section-title">⛓ CHAIN BUILDER</div>
+      </div>
+    </div>
+
+    <div class="highlight-box reveal" style="border-color:rgba(255,214,0,.25);background:rgba(255,214,0,.05)">
+      <div class="highlight-box-title" style="color:var(--a4)">⚡ WHAT IS A CHAIN?</div>
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7">A chain is a queue of dorks you want to run in sequence. Instead of clicking each dork individually, you add multiple dorks from different categories to the chain, then execute them all at once with an animated progress bar. Perfect for running a full recon scan against a target.</div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal reveal-delay-2" style="margin-top:24px">
+      <div class="step-flow">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(255,214,0,.12);color:var(--a4);border:1px solid rgba(255,214,0,.25)">1</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">ADDING TO CHAIN</div>
+            <div class="step-desc">There are 4 ways to add dorks to the chain: hover a dork in Generator and click ⛓, click ⛓ CHAIN on any result card, use ⛓ CHAIN ALL in Search, or use the AI Generate tab's "⛓ CHAIN ALL" button.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(255,214,0,.12);color:var(--a4);border:1px solid rgba(255,214,0,.25)">2</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">EXECUTE CHAIN</div>
+            <div class="step-desc">Click <strong style="color:var(--a4)">▶ EXECUTE CHAIN</strong>. Each dork runs with a 120ms delay between them, showing an animated progress bar. All results are added to the Results panel simultaneously.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(255,214,0,.12);color:var(--a4);border:1px solid rgba(255,214,0,.25)">3</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">MANAGE CHAIN</div>
+            <div class="step-desc">Each chain item has a <strong>▶</strong> button to run just that one dork, <strong>⎘</strong> to copy the query, and <strong style="color:var(--a3)">✕</strong> to remove it. Use <strong>↓ EXPORT CHAIN</strong> to save the chain as a text file.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="mock-ui">
+          <div class="mock-body">
+            <div class="mock-row" style="margin-bottom:8px">
+              <div style="font-family:var(--font-title);font-size:10px;color:var(--a4)">#1</div>
+              <span class="mock-risk cr">CRITICAL</span>
+              <div style="flex:1"><div class="mock-label">Config Files</div><div class="mock-query">site:example.com filetype:env OR cfg</div></div>
+              <div class="mock-btn" style="padding:3px 7px;font-size:8px">▶</div>
+            </div>
+            <div class="mock-row" style="margin-bottom:8px">
+              <div style="font-family:var(--font-title);font-size:10px;color:var(--a4)">#2</div>
+              <span class="mock-risk cr">CRITICAL</span>
+              <div style="flex:1"><div class="mock-label">AWS Credentials</div><div class="mock-query">site:example.com intext:"AKIA"</div></div>
+              <div class="mock-btn" style="padding:3px 7px;font-size:8px">▶</div>
+            </div>
+            <div class="mock-row" style="margin-bottom:12px">
+              <div style="font-family:var(--font-title);font-size:10px;color:var(--a4)">#3</div>
+              <span class="mock-risk hi">HIGH</span>
+              <div style="flex:1"><div class="mock-label">Admin Panels</div><div class="mock-query">site:example.com inurl:admin</div></div>
+              <div class="mock-btn" style="padding:3px 7px;font-size:8px">▶</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:6px;padding:10px">
+              <div style="font-size:10px;color:var(--a4);margin-bottom:6px;font-family:var(--font-mono)">⛓ EXECUTING... 2 / 3</div>
+              <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden">
+                <div style="width:66%;height:100%;background:linear-gradient(90deg,var(--a4),var(--accent));border-radius:2px;animation:chain-prog 2s ease-in-out infinite alternate"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 5. AI GENERATOR -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-ai" data-title="AI GENERATE">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-purple">✦</div>
+      <div class="section-title-group">
+        <div class="section-label c-purple">SECTION 05</div>
+        <div class="section-title">✦ AI GENERATE TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div class="step-flow">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(191,90,242,.12);color:var(--a5);border:1px solid rgba(191,90,242,.25)">1</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">ENTER API KEY</div>
+            <div class="step-desc">Get your Anthropic API key from <strong style="color:var(--a5)">console.anthropic.com</strong>. Paste it into the API KEY field. Click the 👁 button to show/hide it. The key is used only for the current session and never stored.</div>
+            <div class="step-code">Get key at: console.anthropic.com
+Format: sk-ant-api03-...</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(191,90,242,.12);color:var(--a5);border:1px solid rgba(191,90,242,.25)">2</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">QUICK OBJECTIVES (Presets)</div>
+            <div class="step-desc">Click any of the 6 preset buttons to auto-fill the objective box: Credential Hunting, Admin Panel Discovery, Database Exposure, Tech Stack Fingerprint, People &amp; Org OSINT, or Cloud Asset Recon.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(191,90,242,.12);color:var(--a5);border:1px solid rgba(191,90,242,.25)">3</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">WRITE YOUR OBJECTIVE</div>
+            <div class="step-desc">Describe what you're looking for in plain English. The more specific you are, the better the dorks Claude generates. Set the COUNT (6–12 dorks) and click <strong style="color:var(--a5)">✦ GENERATE WITH CLAUDE</strong>.</div>
+            <div class="step-code">Good objective example:
+"Find exposed API keys, database credentials,
+and admin panel access points for a SaaS
+platform. Focus on cloud storage leaks,
+GitHub exposure, and config file dumps."</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:rgba(191,90,242,.12);color:var(--a5);border:1px solid rgba(191,90,242,.25)">4</div><div class="step-line"></div></div>
+          <div class="step-content">
+            <div class="step-title">USE AI RESULTS</div>
+            <div class="step-desc">Each AI-generated dork shows the query, risk level, and an explanation of what it finds. Use <strong>▶ RUN</strong> to execute individually, <strong>⛓ CHAIN</strong> to queue it, or <strong>▶ RUN ALL / ⛓ CHAIN ALL</strong> for batch operations.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card bg-purple" style="margin-bottom:16px">
+          <div class="card-icon">✦</div>
+          <div class="card-title">HOW AI GENERATION WORKS</div>
+          <div class="card-text">Your objective is sent to Claude (claude-sonnet-4-20250514) with a specialized OSINT expert prompt. Claude responds with a JSON array of dorks, each with a label, query template, risk level, and explanation of what the dork finds and why it's effective.</div>
+        </div>
+        <div class="card bg-cyan">
+          <div class="card-icon">🎯</div>
+          <div class="card-title">QUICK OBJECTIVES</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--fg)">
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">🔑 Credential Hunting</div>
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">🔐 Admin Panel Discovery</div>
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">🗄️ Database Exposure</div>
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">⚙️ Tech Stack Fingerprint</div>
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">🕵️ People &amp; Org OSINT</div>
+            <div style="padding:6px 10px;background:var(--bg4);border-radius:4px;border:1px solid var(--border)">☁️ Cloud Asset Recon</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 6. OPERATORS TAB -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-operators" data-title="OPERATORS">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-green">⌗</div>
+      <div class="section-title-group">
+        <div class="section-label c-green">SECTION 06</div>
+        <div class="section-title">⌗ OPERATORS TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div>
+        <p style="font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:20px">The Operators tab is a <strong style="color:var(--fg3)">reference + builder</strong>. The left side lists all 16 Google search operators with descriptions. The right side has an interactive query builder.</p>
+        <table class="info-table" style="margin-bottom:16px">
+          <thead><tr><th>OPERATOR</th><th>PURPOSE</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td>site:</td><td style="color:var(--fg)">Restrict to domain</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">site:example.com</td></tr>
+            <tr><td>inurl:</td><td style="color:var(--fg)">Text in URL path</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">inurl:admin</td></tr>
+            <tr><td>intitle:</td><td style="color:var(--fg)">Text in page title</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">intitle:"index of"</td></tr>
+            <tr><td>intext:</td><td style="color:var(--fg)">Text in body</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">intext:password</td></tr>
+            <tr><td>filetype:</td><td style="color:var(--fg)">File extension</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">filetype:sql</td></tr>
+            <tr><td>-</td><td style="color:var(--fg)">Exclude term</td><td style="color:var(--fg);font-family:var(--font-mono);font-size:10px">-github</td></tr>
+          </tbody>
+        </table>
+        <div class="card-tip">Click any operator card on the left to auto-populate the query builder</div>
+      </div>
+      <div>
+        <div class="card bg-green">
+          <div class="card-title">QUERY BUILDER — HOW TO USE</div>
+          <div class="step-flow" style="margin-top:8px">
+            <div class="step" style="padding:10px 0">
+              <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25);width:28px;height:28px;font-size:11px">1</div><div class="step-line"></div></div>
+              <div class="step-content" style="padding-top:4px"><div class="step-desc">Select an operator from the dropdown (e.g. <code style="color:var(--a2)">site:</code>), type a value (e.g. <code style="color:var(--a2)">example.com</code>), click <strong>+ ADD</strong> to create a chip</div></div>
+            </div>
+            <div class="step" style="padding:10px 0">
+              <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25);width:28px;height:28px;font-size:11px">2</div><div class="step-line"></div></div>
+              <div class="step-content" style="padding-top:4px"><div class="step-desc">Repeat to build a multi-operator query. Each chip appears above — click its ✕ to remove it.</div></div>
+            </div>
+            <div class="step" style="padding:10px 0">
+              <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25);width:28px;height:28px;font-size:11px">3</div><div class="step-line"></div></div>
+              <div class="step-content" style="padding-top:4px"><div class="step-desc">Add extra keywords in the "additional terms" field. The PREVIEW shows your full query. Click <strong>▶ RUN QUERY</strong>, <strong>⛓ ADD TO CHAIN</strong>, or <strong>⎘ COPY</strong>.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card bg-cyan" style="margin-top:12px">
+          <div class="card-title">ADVANCED COMBINATIONS</div>
+          <div class="card-text">Below the builder are 6 pre-built advanced combination queries that chain multiple operators together for maximum effectiveness. Click the <strong>▶</strong> button next to any to run it immediately.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 7. CUSTOM BUILDER -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-builder" data-title="BUILDER">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-orange">✏</div>
+      <div class="section-title-group">
+        <div class="section-label c-orange">SECTION 07</div>
+        <div class="section-title">✏ CUSTOM BUILDER TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div>
+        <p style="font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:20px">Create, save, and manage your own dork templates. Use <code style="color:var(--accent2);background:var(--bg3);padding:2px 8px;border-radius:3px">{"{target}"}</code> as a placeholder — it gets replaced with your target domain when you run the dork.</p>
+        <div class="step-flow">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(255,140,66,.1);color:var(--a6);border:1px solid rgba(255,140,66,.25)">1</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">FILL IN THE FORM</div>
+              <div class="step-desc">Enter a <strong>label</strong> (name), choose a <strong>risk level</strong>, set a <strong>category</strong> name, write your <strong>template</strong>, and add comma-separated <strong>tags</strong> for filtering in Search.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(255,140,66,.1);color:var(--a6);border:1px solid rgba(255,140,66,.25)">2</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">LIVE PREVIEW</div>
+              <div class="step-desc">As you type your template, the PREVIEW box shows the resolved query with your target domain substituted in. This lets you verify the query looks correct before running it.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(255,140,66,.1);color:var(--a6);border:1px solid rgba(255,140,66,.25)">3</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">3 ACTIONS</div>
+              <div class="step-desc"><strong style="color:var(--accent)">▶ RUN NOW</strong> — immediately executes and adds to results. <strong style="color:var(--a4)">⛓ ADD TO CHAIN</strong> — queues it. <strong style="color:var(--a5)">♥ SAVE DORK</strong> — persists it in the session for reuse.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card bg-orange">
+          <div class="card-title">EXAMPLE CUSTOM DORK</div>
+          <div class="step-code" style="margin-top:8px">Label: Password Exposure Hunt
+Risk: critical
+Category: Secrets
+Template: site:{target} intext:"password" 
+          OR intext:"passwd" 
+          filetype:txt OR filetype:log
+Tags: secrets, passwords, files
+
+→ Resolves to:
+site:example.com intext:"password" 
+OR intext:"passwd" 
+filetype:txt OR filetype:log</div>
+        </div>
+        <div class="card bg-cyan" style="margin-top:12px">
+          <div class="card-title">IMPORT DORK</div>
+          <div class="card-text">Paste a raw dork query string OR a JSON object into the IMPORT DORK field on the right side. Supports formats:<br><br>
+          <strong>Raw:</strong> <code style="color:var(--accent);font-size:10px">site:{"{target}"} intext:"api_key"</code><br><br>
+          <strong>JSON:</strong> <code style="color:var(--accent);font-size:10px">{"{"}"label":"...","template":"...","risk":"..."{"}"}</code>
+          </div>
+          <div class="card-tip">Great for importing dorks from external collections or teammates</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 8. EXPORT TAB -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-export" data-title="EXPORT">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-green">↓</div>
+      <div class="section-title-group">
+        <div class="section-label c-green">SECTION 08</div>
+        <div class="section-title">↓ EXPORT TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div>
+        <div class="step-flow">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25)">1</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">CHOOSE FORMAT</div>
+              <div class="step-desc">Select from 4 export formats using the format grid buttons. The format auto-updates the preview panel on the right so you can see exactly what will be downloaded.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25)">2</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">RISK FILTER</div>
+              <div class="step-desc">Choose which results to include: <strong>All Risks</strong>, <strong>Critical Only</strong>, or <strong>High &amp; Above</strong>. The export stats show how many results will be included.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,255,157,.12);color:var(--a2);border:1px solid rgba(0,255,157,.25)">3</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">DOWNLOAD OR COPY</div>
+              <div class="step-desc"><strong>↓ DOWNLOAD REPORT</strong> saves a file named <code style="color:var(--a2);font-size:10px">dork-report-TARGET-TIMESTAMP.FORMAT</code>. <strong>⎘ COPY TO CLIPBOARD</strong> copies the full export content for pasting into other tools.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="content-grid content-grid-2" style="align-content:start;gap:12px">
+        <div class="card bg-green">
+          <div style="font-size:28px;margin-bottom:6px">📄</div>
+          <div class="card-title">.TXT FORMAT</div>
+          <div class="card-text" style="font-size:12px">Human-readable report with risk labels, queries, URLs, and metadata. Best for sharing with non-technical stakeholders.</div>
+        </div>
+        <div class="card bg-cyan">
+          <div style="font-size:28px;margin-bottom:6px">📊</div>
+          <div class="card-title">.CSV FORMAT</div>
+          <div class="card-text" style="font-size:12px">Spreadsheet-compatible with columns: Label, Risk, Category, Query, URL, Target, Time. Import into Excel, Sheets, or databases.</div>
+        </div>
+        <div class="card bg-purple">
+          <div style="font-size:28px;margin-bottom:6px">🗂</div>
+          <div class="card-title">.JSON FORMAT</div>
+          <div class="card-text" style="font-size:12px">Structured JSON array. Ideal for programmatic processing, integrating with SIEM tools, or building automation scripts.</div>
+        </div>
+        <div class="card bg-orange">
+          <div style="font-size:28px;margin-bottom:6px">📝</div>
+          <div class="card-title">.MD FORMAT</div>
+          <div class="card-text" style="font-size:12px">Markdown report with headers for each dork. Perfect for GitHub, Notion, Obsidian, or any documentation platform.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 9. RADAR TAB -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-radar" data-title="RADAR">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-cyan">◎</div>
+      <div class="section-title-group">
+        <div class="section-label c-cyan">SECTION 09</div>
+        <div class="section-title">◎ RADAR TAB</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-2 reveal">
+      <div>
+        <p style="font-size:14px;color:var(--fg2);line-height:1.8;margin-bottom:20px">The Radar tab provides a <strong style="color:var(--fg3)">visual threat map</strong> of your scan results. A spider/radar chart shows how many dorks you've run per category, weighted by risk severity.</p>
+        <div class="step-flow">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.12);color:var(--accent);border:1px solid rgba(0,229,255,.25)">1</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">LEFT PANEL — THREAT STATS</div>
+              <div class="step-desc">Shows a live breakdown: total queries run, plus a count for each risk level (Critical, High, Medium, Low). Below that, each category shows its result count and a proportional bar.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.12);color:var(--accent);border:1px solid rgba(0,229,255,.25)">2</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">RADAR CHART</div>
+              <div class="step-desc">Each axis represents a category. The polygon's shape shows where your recon is concentrated. A larger polygon on the "Secrets" axis means more credential-related dorks were run. Numbers in parentheses show result count per category.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:rgba(0,229,255,.12);color:var(--accent);border:1px solid rgba(0,229,255,.25)">3</div><div class="step-line"></div></div>
+            <div class="step-content">
+              <div class="step-title">REFRESH RADAR</div>
+              <div class="step-desc">Click <strong>↺ REFRESH RADAR</strong> to redraw the chart with the latest results. The radar is also redrawn automatically each time you switch to this tab.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="radar-wrap">
+        <canvas id="demo-radar" width="320" height="320" style="border-radius:50%;box-shadow:0 0 40px rgba(0,229,255,.1)"></canvas>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 10. KEYBOARD SHORTCUTS -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-shortcuts" data-title="SHORTCUTS">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-yellow">⌨</div>
+      <div class="section-title-group">
+        <div class="section-label c-yellow">SECTION 10</div>
+        <div class="section-title">KEYBOARD SHORTCUTS</div>
+      </div>
+    </div>
+
+    <div class="kb-grid reveal">
+      <div class="kb-item"><span class="kb-key">Ctrl + Enter</span><span class="kb-desc">Run all dorks in current category</span></div>
+      <div class="kb-item"><span class="kb-key">Ctrl + K</span><span class="kb-desc">Focus the target domain input</span></div>
+      <div class="kb-item"><span class="kb-key">Ctrl + F</span><span class="kb-desc">Switch to Search tab + focus input</span></div>
+      <div class="kb-item"><span class="kb-key">Ctrl + E</span><span class="kb-desc">Switch to Export tab</span></div>
+      <div class="kb-item"><span class="kb-key">Escape</span><span class="kb-desc">Close any open modal/dialog</span></div>
+      <div class="kb-item"><span class="kb-key">Enter</span><span class="kb-desc">In target field — runs all current category</span></div>
+      <div class="kb-item"><span class="kb-key">Double-Click</span><span class="kb-desc">On search table row — runs that dork</span></div>
+      <div class="kb-item"><span class="kb-key">Click Query</span><span class="kb-desc">On result card query text — copies it</span></div>
+    </div>
+
+    <div class="highlight-box reveal reveal-delay-2" style="margin-top:24px">
+      <div class="highlight-box-title">⚡ PRO WORKFLOW</div>
+      <div style="font-size:13px;color:var(--fg2);line-height:1.8">
+        1. Press <kbd style="background:var(--bg3);border:1px solid var(--border3);padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:11px;color:var(--accent)">Ctrl+K</kbd> → type target → <kbd style="background:var(--bg3);border:1px solid var(--border3);padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:11px;color:var(--accent)">Enter</kbd> to run generator<br>
+        2. Press <kbd style="background:var(--bg3);border:1px solid var(--border3);padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:11px;color:var(--accent)">Ctrl+F</kbd> → search "critical" → chain all matches<br>
+        3. Switch to Chain tab → <kbd style="background:var(--bg3);border:1px solid var(--border3);padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:11px;color:var(--accent)">Execute Chain</kbd><br>
+        4. Press <kbd style="background:var(--bg3);border:1px solid var(--border3);padding:2px 7px;border-radius:3px;font-family:var(--font-mono);font-size:11px;color:var(--accent)">Ctrl+E</kbd> → export as JSON or MD for your report
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- 11. TIPS & BEST PRACTICES -->
+<!-- ══════════════════════════════════════════════════ -->
+<section class="section" id="s-tips" data-title="TIPS">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <div class="section-icon-wrap iw-green">💡</div>
+      <div class="section-title-group">
+        <div class="section-label c-green">SECTION 11</div>
+        <div class="section-title">TIPS & BEST PRACTICES</div>
+      </div>
+    </div>
+
+    <div class="content-grid content-grid-3 reveal">
+      <div class="card bg-green">
+        <div class="card-icon">🎯</div>
+        <div class="card-title">START FOCUSED</div>
+        <div class="card-text">Begin with the "Secrets & Credentials" and "Auth & Admin" categories — they yield the highest impact findings. Use the CRITICAL filter in results to see the most dangerous exposures first.</div>
+      </div>
+      <div class="card bg-cyan">
+        <div class="card-icon">⛓</div>
+        <div class="card-title">USE CHAINS FOR FULL SCANS</div>
+        <div class="card-text">Search for "critical" to find all critical dorks, chain them all, then execute the chain. This gives you a comprehensive critical-findings scan across all categories in one shot.</div>
+      </div>
+      <div class="card bg-purple">
+        <div class="card-icon">✦</div>
+        <div class="card-title">AI FOR SPECIFICS</div>
+        <div class="card-text">The built-in dorks are general. Use AI Generate for target-specific objectives — tell it the industry (e.g. "fintech startup"), the likely tech stack, and what you're looking for.</div>
+      </div>
+      <div class="card bg-orange">
+        <div class="card-icon">📊</div>
+        <div class="card-title">READ THE RADAR</div>
+        <div class="card-text">After a full scan, check the Radar tab. Categories with larger polygon areas are where you found the most results. This tells you where to focus your manual investigation.</div>
+      </div>
+      <div class="card bg-red">
+        <div class="card-icon">⚠️</div>
+        <div class="card-title">GOOGLE RATE LIMITS</div>
+        <div class="card-text">Google may show CAPTCHAs if you open too many search tabs at once. The tool's "Open All" feature is capped at 15 tabs and uses a 200ms delay. If CAPTCHAs appear, wait and try again.</div>
+      </div>
+      <div class="card bg-yellow">
+        <div class="card-icon">📤</div>
+        <div class="card-title">EXPORT EARLY</div>
+        <div class="card-text">Results only persist in the current browser session. Export your findings before closing the tab. Use JSON for programmatic processing or MD for documentation and reports.</div>
+      </div>
+    </div>
+
+    <div class="warning-box reveal reveal-delay-2">
+      <div class="warning-box-title">⚠ LEGAL DISCLAIMER</div>
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7">This tool generates Google search queries only. <strong style="color:var(--fg3)">It does not perform any unauthorized access or hacking.</strong> However, the information discovered through these queries may be sensitive. Always ensure you have explicit written authorization before conducting reconnaissance on any target. Unauthorized use of OSINT techniques against systems you do not own or have permission to test may be illegal in your jurisdiction.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="footer-title">DORK//ENGINE</div>
+  <div class="footer-text">Advanced OSINT Recon Framework — All 8 sections explained. Open the HTML file in any browser to start using the tool.</div>
+  <div class="feature-pills" style="justify-content:center;margin-top:12px">
+    <div class="pill"><div class="pill-dot" style="background:var(--accent)"></div>70+ Dorks</div>
+    <div class="pill"><div class="pill-dot" style="background:var(--a2)"></div>7 Categories</div>
+    <div class="pill"><div class="pill-dot" style="background:var(--a5)"></div>AI Powered</div>
+    <div class="pill"><div class="pill-dot" style="background:var(--a4)"></div>Chain Builder</div>
+    <div class="pill"><div class="pill-dot" style="background:var(--a3)"></div>4 Export Formats</div>
+    <div class="pill"><div class="pill-dot" style="background:var(--a6)"></div>Radar Viz</div>
+  </div>
+  <div class="warning-strip">⚠ FOR AUTHORIZED SECURITY RESEARCH AND EDUCATIONAL USE ONLY ⚠</div>
+</footer>
+
+</div><!-- /#app -->
+
+<button id="back-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+// ── BACKGROUND MATRIX ──
+(function(){
+  const c=document.getElementById('bg-canvas');const ctx=c.getContext('2d');
+  let W,H,drops=[];
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;drops=Array.from({length:Math.floor(W/18)},()=>Math.random()*H/16);}
+  resize();window.addEventListener('resize',resize);
+  const chars='ァイウエオ0123456789ABCDEF<>';
+  function frame(){
+    ctx.fillStyle='rgba(3,5,10,0.055)';ctx.fillRect(0,0,W,H);
+    ctx.font='11px monospace';
+    drops.forEach((y,i)=>{
+      ctx.fillStyle=`rgba(0,229,255,${Math.random()*.12+.02})`;
+      ctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*18,y*16);
+      if(y*16>H&&Math.random()>.977)drops[i]=0;drops[i]++;
+    });requestAnimationFrame(frame);
+  }frame();
+})();
+
+// ── NAV BUILD ──
+const sections=[
+  {id:'s-overview',title:'OVERVIEW'},
+  {id:'s-header',title:'HEADER'},
+  {id:'s-generator',title:'GENERATOR'},
+  {id:'s-search',title:'SEARCH'},
+  {id:'s-chain',title:'CHAIN'},
+  {id:'s-ai',title:'AI GENERATE'},
+  {id:'s-operators',title:'OPERATORS'},
+  {id:'s-builder',title:'BUILDER'},
+  {id:'s-export',title:'EXPORT'},
+  {id:'s-radar',title:'RADAR'},
+  {id:'s-shortcuts',title:'SHORTCUTS'},
+  {id:'s-tips',title:'TIPS'},
+];
+const navLinks=document.getElementById('nav-links');
+sections.forEach(s=>{
+  const a=document.createElement('div');a.className='nav-link';a.textContent=s.title;
+  a.onclick=()=>document.getElementById(s.id).scrollIntoView({behavior:'smooth'});
+  navLinks.appendChild(a);
+});
+const chips=document.getElementById('section-chips');
+sections.forEach(s=>{
+  const c=document.createElement('div');c.className='s-chip';c.textContent=s.title;
+  c.onclick=()=>document.getElementById(s.id).scrollIntoView({behavior:'smooth'});
+  chips.appendChild(c);
+});
+
+// ── SCROLL HANDLER ──
+const nav=document.getElementById('nav');
+const backTop=document.getElementById('back-top');
+const prog=document.getElementById('nav-progress');
+window.addEventListener('scroll',()=>{
+  const y=window.scrollY;const total=document.body.scrollHeight-window.innerHeight;
+  nav.classList.toggle('visible',y>300);
+  backTop.classList.toggle('visible',y>600);
+  prog.style.width=(y/total*100)+'%';
+  sections.forEach((s,i)=>{
+    const el=document.getElementById(s.id);if(!el)return;
+    const rect=el.getBoundingClientRect();
+    if(rect.top<=150&&rect.bottom>=150){
+      document.querySelectorAll('.nav-link').forEach((l,j)=>l.classList.toggle('active',i===j));
+    }
+  });
+});
+
+// ── REVEAL ON SCROLL ──
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// ── DEMO RADAR ──
+function drawDemoRadar(){
+  const canvas=document.getElementById('demo-radar');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const W=320,H=320,cx=W/2,cy=H/2,R=120;
+  ctx.clearRect(0,0,W,H);
+  const cats=['File','Auth','Secrets','Dirs','Tech','Cloud','OSINT'];
+  const N=cats.length;
+  const angles=cats.map((_,i)=>(-Math.PI/2)+(2*Math.PI/N)*i);
+  const scores=[0.6,0.8,1.0,0.4,0.5,0.7,0.35];
+  [.25,.5,.75,1].forEach(f=>{
+    ctx.beginPath();
+    angles.forEach((a,i)=>{const x=cx+Math.cos(a)*R*f,y=cy+Math.sin(a)*R*f;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.closePath();ctx.strokeStyle=`rgba(0,229,255,${.05+f*.07})`;ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle=`rgba(0,229,255,${.01+f*.015})`;ctx.fill();
+  });
+  angles.forEach(a=>{ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R);ctx.strokeStyle='rgba(0,229,255,.1)';ctx.lineWidth=1;ctx.stroke();});
+  ctx.beginPath();
+  angles.forEach((a,i)=>{const v=scores[i]*R,x=cx+Math.cos(a)*v,y=cy+Math.sin(a)*v;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+  ctx.closePath();ctx.fillStyle='rgba(0,229,255,.18)';ctx.fill();ctx.strokeStyle='rgba(0,229,255,.8)';ctx.lineWidth=2;ctx.stroke();
+  angles.forEach((a,i)=>{
+    const v=scores[i]*R;ctx.beginPath();ctx.arc(cx+Math.cos(a)*v,cy+Math.sin(a)*v,4,0,Math.PI*2);
+    ctx.fillStyle='#00e5ff';ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.stroke();
+  });
+  ctx.font='10px "Share Tech Mono"';
+  angles.forEach((a,i)=>{
+    const x=cx+Math.cos(a)*(R+18),y=cy+Math.sin(a)*(R+18);
+    ctx.fillStyle='rgba(200,218,232,.7)';
+    ctx.textAlign=Math.cos(a)<-.1?'right':Math.cos(a)>.1?'left':'center';
+    ctx.textBaseline=Math.sin(a)<-.1?'bottom':Math.sin(a)>.1?'top':'middle';
+    ctx.fillText(cats[i],x,y);
+  });
+  ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#00e5ff';ctx.fill();
+}
+setTimeout(drawDemoRadar,500);
+
+// ── CHAIN PROGRESS ANIM ──
+const style=document.createElement('style');
+style.textContent='@keyframes chain-prog{0%{width:0%}100%{width:66%}}';
+document.head.appendChild(style);
+</script>
+</body>
+</html>
